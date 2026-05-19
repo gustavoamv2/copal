@@ -50,7 +50,6 @@ export function CalendarPage() {
           }}
           buttonText={{ today: "Hoy" }}
           eventDisplay="block"
-          eventBorderRadius={4}
         />
       </div>
     </div>
