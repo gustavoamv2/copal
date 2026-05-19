@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  instagram
+  facebook
+  linkedin
+}
+
+enum PostStatus {
+  draft
+  pending
+  approved
+  scheduled
+  published
+  failed
+}
+
+enum PublicationStatus {
+  pending
+  processing
+  published
+  failed
+}
+
+enum UserRole {
+  admin
+  editor
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password_hash String
+  role          UserRole @default(editor)
+  timezone      String   @default("America/Santiago")
+  created_at    DateTime @default(now())
+
+  social_accounts    SocialAccount[]
+  posts              Post[]
+  media_assets       MediaAsset[]
+  caption_templates  CaptionTemplate[]
+  hashtag_groups     HashtagGroup[]
+  refresh_tokens     RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  user_id    String
+  token_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model SocialAccount {
+  id                 String    @id @default(uuid())
+  user_id            String
+  platform           Platform
+  account_name       String
+  account_id         String
+  access_token_enc   String
+  refresh_token_enc  String?
+  token_expires_at   DateTime?
+  is_active          Boolean   @default(true)
+  created_at         DateTime  @default(now())
+
+  user              User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post_variants     PostPlatformVariant[]
+  scheduled_pubs    ScheduledPublication[]
+  publication_logs  PublicationLog[]
+
+  @@unique([user_id, platform, account_id])
+  @@map("social_accounts")
+}
+
+model Post {
+  id            String     @id @default(uuid())
+  user_id       String
+  title         String
+  base_caption  String     @db.Text
+  status        PostStatus @default(draft)
+  scheduled_at  DateTime?
+  published_at  DateTime?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  user          User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  variants      PostPlatformVariant[]
+  post_media    PostMedia[]
+  scheduled_pubs ScheduledPublication[]
+
+  @@map("posts")
+}
+
+model PostPlatformVariant {
+  id               String     @id @default(uuid())
+  post_id          String
+  social_account_id String
+  platform         Platform
+  caption          String     @db.Text
+  status           PostStatus @default(draft)
+  platform_post_id String?
+  published_at     DateTime?
+  error_message    String?
+
+  post             Post                   @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  social_account   SocialAccount          @relation(fields: [social_account_id], references: [id], onDelete: Cascade)
+  scheduled_pubs   ScheduledPublication[]
+  publication_logs PublicationLog[]
+
+  @@map("post_platform_variants")
+}
+
+model MediaAsset {
+  id               String   @id @default(uuid())
+  user_id          String
+  filename         String
+  file_type        String
+  storage_url      String
+  thumbnail_url    String?
+  file_size_bytes  Int
+  tags             String[]
+  uploaded_at      DateTime @default(now())
+
+  user       User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post_media PostMedia[]
+
+  @@map("media_assets")
+}
+
+model PostMedia {
+  id             String @id @default(uuid())
+  post_id        String
+  media_asset_id String
+  order_index    Int    @default(0)
+
+  post        Post       @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  media_asset MediaAsset @relation(fields: [media_asset_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, order_index])
+  @@map("post_media")
+}
+
+model ScheduledPublication {
+  id               String            @id @default(uuid())
+  post_id          String
+  post_variant_id  String
+  publish_at       DateTime
+  status           PublicationStatus @default(pending)
+  attempt_count    Int               @default(0)
+  last_attempt_at  DateTime?
+  worker_job_id    String?
+
+  post         Post                @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  post_variant PostPlatformVariant @relation(fields: [post_variant_id], references: [id], onDelete: Cascade)
+  social_account SocialAccount?   @relation(fields: [social_account_id], references: [id])
+  social_account_id String?
+
+  @@map("scheduled_publications")
+}
+
+model PublicationLog {
+  id               String   @id @default(uuid())
+  post_variant_id  String
+  social_account_id String
+  action           String
+  result           String
+  api_response     Json?
+  error_detail     String?
+  logged_at        DateTime @default(now())
+
+  post_variant   PostPlatformVariant @relation(fields: [post_variant_id], references: [id], onDelete: Cascade)
+  social_account SocialAccount       @relation(fields: [social_account_id], references: [id], onDelete: Cascade)
+
+  @@map("publication_logs")
+}
+
+model CaptionTemplate {
+  id         String    @id @default(uuid())
+  user_id    String
+  name       String
+  body       String    @db.Text
+  hashtags   String[]
+  platform   Platform?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("caption_templates")
+}
+
+model HashtagGroup {
+  id         String   @id @default(uuid())
+  user_id    String
+  name       String
+  hashtags   String[]
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("hashtag_groups")
+}

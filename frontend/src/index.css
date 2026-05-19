@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 14% 7%;
+    --foreground: 210 20% 92%;
+    --card: 222 14% 10%;
+    --card-foreground: 210 20% 92%;
+    --border: 222 14% 16%;
+    --input: 222 14% 14%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 14% 14%;
+    --secondary-foreground: 210 20% 80%;
+    --muted: 222 14% 14%;
+    --muted-foreground: 215 16% 50%;
+    --accent: 222 14% 16%;
+    --accent-foreground: 210 20% 92%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --ring: 217 91% 60%;
+    --radius: 0.5rem;
+    --sidebar: 222 14% 5%;
+    --sidebar-foreground: 210 20% 80%;
+    --sidebar-border: 222 14% 13%;
+    --sidebar-accent: 222 14% 12%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .platform-instagram { @apply bg-[#E1306C]/10 text-[#E1306C] border-[#E1306C]/30; }
+  .platform-facebook  { @apply bg-[#1877F2]/10 text-[#1877F2] border-[#1877F2]/30; }
+  .platform-linkedin  { @apply bg-[#0A66C2]/10 text-[#0A66C2] border-[#0A66C2]/30; }
+}
