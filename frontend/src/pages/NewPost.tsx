@@ -20,7 +20,11 @@ export function NewPost() {
 
   const [title, setTitle] = useState("");
   const [baseCaption, setBaseCaption] = useState("");
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 5);
+    return d.toISOString().slice(0, 16);
+  });
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(["linkedin"]);

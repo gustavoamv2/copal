@@ -33,12 +33,18 @@ router.get("/", async (req: AuthRequest, res, next) => {
       ...(status ? { status: status as any } : {}),
     };
 
+    // When filtering by scheduled status, order by scheduled_at ascending
+    // so the soonest publications come first. Otherwise order by created_at desc.
+    const orderBy = status === "scheduled"
+      ? { scheduled_at: "asc" as const }
+      : { created_at: "desc" as const };
+
     const [posts, total] = await Promise.all([
       prisma.post.findMany({
         where,
         skip,
         take: parseInt(limit),
-        orderBy: { created_at: "desc" },
+        orderBy,
         include: {
           variants: { include: { social_account: { select: { account_name: true, platform: true } } } },
           post_media: { include: { media_asset: true }, orderBy: { order_index: "asc" } },
