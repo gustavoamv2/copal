@@ -147,21 +147,32 @@ export function NewPost() {
             </div>
           )}
           {showMediaPicker && (
-            <div className="mt-4 border-t border-border pt-4 grid grid-cols-4 gap-2 max-h-60 overflow-y-auto">
-              {media?.data.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    if (!selectedMedia.find((s) => s.id === m.id)) {
-                      setSelectedMedia((prev) => [...prev, m]);
-                    }
-                    setShowMediaPicker(false);
-                  }}
-                  className="h-16 w-full rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
-                >
-                  <img src={m.thumbnail_url ?? m.storage_url} alt={m.filename} className="h-full w-full object-cover" />
-                </button>
-              ))}
+            <div className="mt-4 border-t border-border pt-4">
+              {!media?.data.length ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Sin imágenes.{" "}
+                  <a href="/media" className="underline hover:text-foreground">
+                    Sube imágenes en la biblioteca
+                  </a>
+                </p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto">
+                  {media.data.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        if (!selectedMedia.find((s) => s.id === m.id)) {
+                          setSelectedMedia((prev) => [...prev, m]);
+                        }
+                        setShowMediaPicker(false);
+                      }}
+                      className="h-16 w-full rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                    >
+                      <img src={m.thumbnail_url ?? m.storage_url} alt={m.filename} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
