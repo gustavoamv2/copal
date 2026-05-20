@@ -49,8 +49,8 @@ export function CalendarPage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const { data } = useQuery({
-    queryKey: ["posts", { limit: 100 }],
-    queryFn: () => postsApi.list({ limit: 100 }).then((r) => r.data),
+    queryKey: ["posts", { limit: 500 }],
+    queryFn: () => postsApi.list({ limit: 500 }).then((r) => r.data),
   });
 
   const posts = data?.data ?? [];

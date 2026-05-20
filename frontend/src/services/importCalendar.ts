@@ -200,7 +200,7 @@ export async function importPublication(
       title: pub.title,
       base_caption: pub.caption,
       status: effectiveMode === "draft" ? "draft" : "scheduled",
-      scheduled_at: effectiveMode === "scheduled" ? scheduledDate!.toISOString() : null,
+      scheduled_at: scheduledDate ? scheduledDate.toISOString() : null,
       variants: [],
       media_ids: imageMediaId ? [imageMediaId] : [],
     });

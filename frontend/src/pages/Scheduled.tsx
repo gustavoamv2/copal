@@ -51,9 +51,9 @@ function PostsTab() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["posts", { status, limit: 100 }],
+    queryKey: ["posts", { status, limit: 500 }],
     queryFn: () =>
-      postsApi.list({ status: status || undefined, limit: 100 }).then((r) => r.data),
+      postsApi.list({ status: status || undefined, limit: 500 }).then((r) => r.data),
     refetchInterval: 30_000,
   });
 
