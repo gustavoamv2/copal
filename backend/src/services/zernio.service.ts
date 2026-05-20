@@ -21,11 +21,7 @@ class ZernioService {
   private readonly baseUrl = 'https://zernio.com/api/v1';
 
   constructor() {
-    const key = process.env.ZERNIO_API_KEY;
-    if (!key) {
-      throw new Error('ZERNIO_API_KEY no está definida en las variables de entorno');
-    }
-    this.apiKey = key;
+    this.apiKey = process.env.ZERNIO_API_KEY ?? '';
   }
 
   private get headers() {

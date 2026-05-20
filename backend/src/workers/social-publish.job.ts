@@ -3,7 +3,9 @@
 // Agregar este worker a tu proceso de workers existente
 
 import { Worker, Job } from 'bullmq';
+import IORedis from 'ioredis';
 import { zernioService, SocialPlatform } from '../services/zernio.service';
+import { config } from '../config';
 
 export interface SocialPublishJobData {
   postId: string;              // ID interno del post en tu BD
@@ -14,6 +16,8 @@ export interface SocialPublishJobData {
 }
 
 const QUEUE_NAME = 'social-publish';
+
+const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null });
 
 export const socialPublishWorker = new Worker<SocialPublishJobData>(
   QUEUE_NAME,
@@ -49,11 +53,7 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
     return result;
   },
   {
-    connection: {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
-    },
+    connection,
     concurrency: 3,
     // Reintentos con backoff exponencial
     defaultJobOptions: {

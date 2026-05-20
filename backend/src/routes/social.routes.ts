@@ -3,19 +3,17 @@
 
 import { Router, Request, Response } from 'express';
 import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
 import { zernioService, SocialPlatform } from '../services/zernio.service';
-import { SocialPublishJobData } from '../jobs/social-publish.job';
+import { SocialPublishJobData } from '../workers/social-publish.job';
+import { config } from '../config';
 
 const router = Router();
 
+const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null });
+
 // Cola BullMQ para publicación asíncrona
-const socialQueue = new Queue<SocialPublishJobData>('social-publish', {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD,
-  },
-});
+const socialQueue = new Queue<SocialPublishJobData>('social-publish', { connection });
 
 const VALID_PLATFORMS: SocialPlatform[] = ['facebook', 'linkedin', 'instagram'];
 
