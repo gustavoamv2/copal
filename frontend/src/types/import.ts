@@ -1,0 +1,65 @@
+export type ImportNetwork = "Facebook" | "Instagram" | "LinkedIn";
+export type ImportMode = "draft" | "scheduled";
+
+export interface RawPublication {
+  id: string;
+  titulo_interno: string;
+  caption: string;
+  hashtags?: string;
+  caption_con_hashtags?: string;
+  fecha_publicacion: string;
+  hora_publicacion: string;
+  fecha_hora_publicacion: string;
+  redes?: string[];
+  red_social?: string;
+  tipo_publicacion?: string;
+  imagen?: string;
+  estado?: string;
+  origen?: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export type ImportStatus = "pending" | "importing" | "imported" | "error" | "duplicate" | "skipped";
+
+export interface ImportedPublication {
+  raw: RawPublication;
+  // editable fields
+  title: string;
+  caption: string;
+  scheduledAt: string; // ISO datetime local string for input[datetime-local]
+  networks: ImportNetwork[];
+  instagramType: "feed" | "story" | "carousel";
+  imagePath: string;
+  imageFile?: File;
+  imageUrl?: string;
+  // state
+  validation: ValidationResult;
+  importStatus: ImportStatus;
+  importError?: string;
+  isDuplicate: boolean;
+  selected: boolean;
+}
+
+export interface ImportResult {
+  id: string;
+  title: string;
+  success: boolean;
+  error?: string;
+  skipped?: boolean;
+  duplicate?: boolean;
+}
+
+export interface ImportReport {
+  total: number;
+  imported: number;
+  skipped: number;
+  errors: number;
+  duplicates: number;
+  missingImages: number;
+  results: ImportResult[];
+}

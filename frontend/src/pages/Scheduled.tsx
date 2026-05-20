@@ -8,6 +8,7 @@ import { PlatformBadge } from "@/components/PlatformBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "@/hooks/useToast";
 import { formatDateTime } from "@/lib/utils";
+import { ImportCalendarButton } from "@/components/ImportCalendarModal";
 import { Platform, PublicationStatus } from "@/types";
 
 const FILTERS: { label: string; value: string }[] = [
@@ -39,9 +40,12 @@ export function Scheduled() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Publicaciones programadas</h1>
-        <p className="text-muted-foreground text-sm mt-1">Estado en tiempo real de tu cola</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Publicaciones programadas</h1>
+          <p className="text-muted-foreground text-sm mt-1">Estado en tiempo real de tu cola</p>
+        </div>
+        <ImportCalendarButton />
       </div>
 
       <div className="flex gap-2 flex-wrap">
