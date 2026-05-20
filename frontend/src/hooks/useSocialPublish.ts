@@ -1,15 +1,11 @@
-// src/hooks/useSocialPublish.ts (Frontend React)
-// Hook para publicar posts desde cualquier componente
-
-import { useState } from 'react';
-
-type Platform = 'facebook' | 'linkedin' | 'instagram';
+import { useState } from "react";
+import { socialApi, SocialPlatform } from "@/api/social";
 
 interface PublishOptions {
   content: string;
-  platforms: Platform[];
+  platforms: SocialPlatform[];
   mediaUrls?: string[];
-  scheduledAt?: string; // ISO 8601 para programar
+  scheduledAt?: string;
 }
 
 interface PublishResult {
@@ -28,30 +24,23 @@ export const useSocialPublish = () => {
     setResult(null);
 
     try {
-      const endpoint = options.scheduledAt
-        ? '/api/social/schedule'
-        : '/api/social/publish';
+      const isScheduled = !!options.scheduledAt;
+      const response = isScheduled
+        ? await socialApi.schedule({ ...options, scheduledAt: options.scheduledAt! })
+        : await socialApi.publish(options);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Para enviar la cookie JWT httpOnly
-        body: JSON.stringify(options),
-      });
-
-      const data = await response.json();
-
-      const res: PublishResult = response.ok
-        ? { success: true, jobId: data.jobId, message: data.message }
-        : { success: false, error: data.error };
-
+      const res: PublishResult = {
+        success: true,
+        jobId: response.data.jobId,
+        message: response.data.message,
+      };
       setResult(res);
       return res;
-    } catch (error) {
-      const res: PublishResult = {
-        success: false,
-        error: error instanceof Error ? error.message : 'Error de conexión',
-      };
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        (error instanceof Error ? error.message : "Error de conexión");
+      const res: PublishResult = { success: false, error: message };
       setResult(res);
       return res;
     } finally {

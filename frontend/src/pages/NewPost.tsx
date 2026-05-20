@@ -5,6 +5,8 @@ import { Plus, X, Image as ImageIcon, Instagram, Facebook, Linkedin } from "luci
 import { postsApi } from "@/api/posts";
 import { mediaApi } from "@/api/media";
 import { accountsApi } from "@/api/accounts";
+import { useSocialPublish } from "@/hooks/useSocialPublish";
+import type { SocialPlatform } from "@/api/social";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +39,7 @@ export function NewPost() {
   const [variants, setVariants] = useState<Record<string, string>>({});
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const { publish, loading: publishing } = useSocialPublish();
 
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
@@ -87,6 +90,18 @@ export function NewPost() {
   };
 
   const activeAccounts = (accounts ?? []).filter((a) => selectedAccounts.includes(a.id));
+
+  const handlePublishNow = async () => {
+    if (!baseCaption || activeAccounts.length === 0) return;
+    const platforms = [...new Set(activeAccounts.map((a) => a.platform as SocialPlatform))];
+    const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
+    const res = await publish({ content: baseCaption, platforms, mediaUrls });
+    if (res.success) {
+      toast({ title: "Publicado en redes sociales ✓" });
+    } else {
+      toast({ title: res.error ?? "Error al publicar", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -302,6 +317,14 @@ export function NewPost() {
               Programar
             </Button>
           </div>
+          <Button
+            className="w-full"
+            variant="default"
+            disabled={!baseCaption || activeAccounts.length === 0 || publishing}
+            onClick={handlePublishNow}
+          >
+            {publishing ? "Publicando..." : "Publicar ahora en redes"}
+          </Button>
         </div>
       </div>
     </div>
