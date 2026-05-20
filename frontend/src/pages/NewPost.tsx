@@ -5,7 +5,7 @@ import { X, ImageIcon } from "lucide-react";
 import { postsApi } from "@/api/posts";
 import { mediaApi } from "@/api/media";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
-import type { SocialPlatform } from "@/api/social";
+import type { SocialPlatform, InstagramPostType } from "@/api/social";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,7 @@ export function NewPost() {
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(["linkedin"]);
+  const [instagramType, setInstagramType] = useState<InstagramPostType>("feed");
   const { publish, loading: publishing } = useSocialPublish();
 
   const toggleAyrPlatform = (p: SocialPlatform) =>
@@ -71,7 +72,7 @@ export function NewPost() {
       return;
     }
 
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso });
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso, instagramType });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
@@ -203,22 +204,56 @@ export function NewPost() {
         {/* Publicar via Ayrshare */}
         <div className="border border-border rounded-lg p-4 space-y-3">
           <p className="text-sm font-medium">Publicar en redes sociales</p>
-          <div className="flex gap-2">
-            {(["facebook", "instagram", "linkedin"] as SocialPlatform[]).map((p) => (
+
+          {/* Selector de plataformas */}
+          <div className="flex flex-wrap gap-2">
+            {([
+              { id: "facebook", label: "Facebook" },
+              { id: "instagram", label: "Instagram" },
+              { id: "linkedin", label: "LinkedIn" },
+              { id: "whatsapp", label: "WhatsApp" },
+            ] as { id: SocialPlatform; label: string }[]).map(({ id, label }) => (
               <button
-                key={p}
+                key={id}
                 type="button"
-                onClick={() => toggleAyrPlatform(p)}
+                onClick={() => toggleAyrPlatform(id)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  ayrPlatforms.includes(p)
+                  ayrPlatforms.includes(id)
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-background text-muted-foreground border-border hover:border-primary/50"
                 }`}
               >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
+                {label}
               </button>
             ))}
           </div>
+
+          {/* Tipo de contenido Instagram */}
+          {ayrPlatforms.includes("instagram") && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Tipo de contenido en Instagram</p>
+              <div className="flex gap-2">
+                {([
+                  { id: "feed", label: "Publicación" },
+                  { id: "carousel", label: "Carrusel" },
+                  { id: "story", label: "Historia" },
+                ] as { id: InstagramPostType; label: string }[]).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setInstagramType(id)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      instagramType === id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <Button
             className="w-full"
             disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}

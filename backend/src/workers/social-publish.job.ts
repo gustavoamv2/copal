@@ -4,15 +4,16 @@
 
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { ayrshareService, SocialPlatform } from '../services/ayrshare.service';
+import { ayrshareService, SocialPlatform, InstagramPostType } from '../services/ayrshare.service';
 import { config } from '../config';
 
 export interface SocialPublishJobData {
-  postId: string;              // ID interno del post en tu BD
+  postId: string;
   content: string;
   platforms: SocialPlatform[];
-  mediaUrls?: string[];        // URLs de Cloudinary
+  mediaUrls?: string[];
   scheduledAt?: string;
+  instagramType?: InstagramPostType;
 }
 
 const QUEUE_NAME = 'social-publish';
@@ -22,7 +23,7 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 export const socialPublishWorker = new Worker<SocialPublishJobData>(
   QUEUE_NAME,
   async (job: Job<SocialPublishJobData>) => {
-    const { postId, content, platforms, mediaUrls, scheduledAt } = job.data;
+    const { postId, content, platforms, mediaUrls, scheduledAt, instagramType } = job.data;
 
     console.log(`[SocialPublish] Procesando post ${postId} para: ${platforms.join(', ')}`);
 
@@ -31,14 +32,14 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
       platforms,
       mediaUrls,
       scheduledAt,
+      instagramType,
     });
 
     if (!result.success) {
-      // BullMQ reintentará automáticamente según la config de reintentos
-      throw new Error(`Zernio error: ${result.error}`);
+      throw new Error(`Ayrshare error: ${result.error}`);
     }
 
-    console.log(`[SocialPublish] Post ${postId} publicado. Zernio ID: ${result.postId}`);
+    console.log(`[SocialPublish] Post ${postId} publicado. ID: ${result.postId}`);
 
     // Aquí puedes actualizar el estado del post en Prisma
     // await prisma.post.update({

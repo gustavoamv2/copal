@@ -1,12 +1,14 @@
 // src/services/ayrshare.service.ts
 
-export type SocialPlatform = 'facebook' | 'linkedin' | 'instagram';
+export type SocialPlatform = 'facebook' | 'linkedin' | 'instagram' | 'whatsapp';
+export type InstagramPostType = 'feed' | 'story' | 'carousel';
 
 export interface AyrsharePostOptions {
   content: string;
   platforms: SocialPlatform[];
   mediaUrls?: string[];
   scheduledAt?: string; // ISO 8601, ej: "2026-05-20T10:00:00Z"
+  instagramType?: InstagramPostType;
 }
 
 export interface AyrsharePostResult {
@@ -47,6 +49,12 @@ class AyrshareService {
 
       if (options.scheduledAt) {
         body.scheduleDate = options.scheduledAt;
+      }
+
+      if (options.instagramType && options.platforms.includes('instagram')) {
+        body.instagramOptions = {
+          story: options.instagramType === 'story',
+        };
       }
 
       const response = await fetch(`${this.baseUrl}/post`, {

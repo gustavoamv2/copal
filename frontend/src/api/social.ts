@@ -1,12 +1,14 @@
 import apiClient from "./client";
 
-export type SocialPlatform = "facebook" | "linkedin" | "instagram";
+export type SocialPlatform = "facebook" | "linkedin" | "instagram" | "whatsapp";
+export type InstagramPostType = "feed" | "story" | "carousel";
 
 export interface PublishPayload {
   content: string;
   platforms: SocialPlatform[];
   mediaUrls?: string[];
   scheduledAt?: string;
+  instagramType?: InstagramPostType;
 }
 
 export const socialApi = {
@@ -15,6 +17,7 @@ export const socialApi = {
       content: payload.content,
       platforms: payload.platforms,
       mediaUrls: payload.mediaUrls ?? [],
+      instagramType: payload.instagramType ?? "feed",
       ...(payload.scheduledAt ? { scheduledAt: payload.scheduledAt } : {}),
     }),
 

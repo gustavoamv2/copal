@@ -15,14 +15,14 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 // Cola BullMQ para publicación asíncrona
 const socialQueue = new Queue<SocialPublishJobData>('social-publish', { connection });
 
-const VALID_PLATFORMS: SocialPlatform[] = ['facebook', 'linkedin', 'instagram'];
+const VALID_PLATFORMS: SocialPlatform[] = ['facebook', 'linkedin', 'instagram', 'whatsapp'];
 
 // ─────────────────────────────────────────────
 // POST /api/social/publish
 // Publica inmediatamente en redes sociales
 // ─────────────────────────────────────────────
 router.post('/publish', async (req: Request, res: Response) => {
-  const { content, platforms, mediaUrls } = req.body;
+  const { content, platforms, mediaUrls, instagramType } = req.body;
 
   // Validaciones
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -45,10 +45,11 @@ router.post('/publish', async (req: Request, res: Response) => {
     const job = await socialQueue.add(
       'publish-now',
       {
-        postId: `post_${Date.now()}`, // reemplaza con el ID real de tu BD
+        postId: `post_${Date.now()}`,
         content: content.trim(),
         platforms,
         mediaUrls: mediaUrls || [],
+        instagramType: instagramType || 'feed',
       },
       {
         attempts: 3,
