@@ -310,7 +310,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   // Publish now
   const { publish, loading: publishing } = useSocialPublish();
   const publishPlatforms = unique.length > 0
-    ? unique.filter((p): p is "instagram" | "facebook" | "linkedin" => p !== "generic") as ("instagram" | "facebook" | "linkedin")[]
+    ? (unique as string[]).filter((p): p is "instagram" | "facebook" | "linkedin" => p !== "generic")
     : (titleLower.includes("instagram") ? ["instagram"]
       : titleLower.includes("facebook") ? ["facebook"]
       : ["linkedin"]) as ("instagram" | "facebook" | "linkedin")[];
