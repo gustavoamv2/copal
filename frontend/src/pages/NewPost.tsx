@@ -39,7 +39,13 @@ export function NewPost() {
   const [variants, setVariants] = useState<Record<string, string>>({});
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(["linkedin"]);
   const { publish, loading: publishing } = useSocialPublish();
+
+  const toggleAyrPlatform = (p: SocialPlatform) =>
+    setAyrPlatforms((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    );
 
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
@@ -92,10 +98,9 @@ export function NewPost() {
   const activeAccounts = (accounts ?? []).filter((a) => selectedAccounts.includes(a.id));
 
   const handlePublishNow = async () => {
-    if (!baseCaption || activeAccounts.length === 0) return;
-    const platforms = [...new Set(activeAccounts.map((a) => a.platform as SocialPlatform))];
+    if (!baseCaption || ayrPlatforms.length === 0) return;
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
-    const res = await publish({ content: baseCaption, platforms, mediaUrls });
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls });
     if (res.success) {
       toast({ title: "Publicado en redes sociales ✓" });
     } else {
@@ -317,14 +322,33 @@ export function NewPost() {
               Programar
             </Button>
           </div>
-          <Button
-            className="w-full"
-            variant="default"
-            disabled={!baseCaption || activeAccounts.length === 0 || publishing}
-            onClick={handlePublishNow}
-          >
-            {publishing ? "Publicando..." : "Publicar ahora en redes"}
-          </Button>
+          {/* Publicar via Ayrshare */}
+          <div className="border border-border rounded-lg p-4 space-y-3">
+            <p className="text-sm font-medium">Publicar en redes ahora</p>
+            <div className="flex gap-2">
+              {(["facebook", "instagram", "linkedin"] as SocialPlatform[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => toggleAyrPlatform(p)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    ayrPlatforms.includes(p)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
+              onClick={handlePublishNow}
+            >
+              {publishing ? "Publicando..." : "Publicar ahora"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
