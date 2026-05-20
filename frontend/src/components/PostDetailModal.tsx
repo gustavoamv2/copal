@@ -19,28 +19,61 @@ type ViewMode  = "preview" | "edit";
 type NetworkTab = Platform | "generic";
 
 // ---------------------------------------------------------------------------
-// Shared image block — shows the full image, no crop, black letterbox
+// Shared image block — shows all images; carousels are slideable
 // ---------------------------------------------------------------------------
-function PostImage({ src, isStory, isCarousel }: { src?: string; isStory?: boolean; isCarousel?: boolean }) {
-  if (!src) {
+function PostImage({ urls, isStory }: { urls: string[]; isStory?: boolean }) {
+  const [idx, setIdx] = useState(0);
+  const maxH = isStory ? "520px" : "480px";
+
+  if (urls.length === 0) {
     return (
       <div className={`w-full bg-[#222] flex items-center justify-center text-gray-500 text-xs ${isStory ? "min-h-[320px]" : "min-h-[200px]"}`}>
         Sin imagen
       </div>
     );
   }
+
   return (
-    <div className="relative w-full bg-black">
+    <div className="relative w-full bg-black select-none">
       <img
-        src={src}
+        src={urls[idx]}
         alt=""
         className="w-full block object-contain"
-        style={{ maxHeight: isStory ? "520px" : "480px" }}
+        style={{ maxHeight: maxH }}
       />
-      {isCarousel && (
-        <span className="absolute top-2 right-2 bg-black/60 text-white rounded-full px-2 py-0.5 text-[10px]">
-          1 / 3
-        </span>
+      {/* Carousel counter + arrows */}
+      {urls.length > 1 && (
+        <>
+          <span className="absolute top-2 right-2 bg-black/60 text-white rounded-full px-2 py-0.5 text-[10px]">
+            {idx + 1} / {urls.length}
+          </span>
+          {idx > 0 && (
+            <button
+              onClick={() => setIdx(idx - 1)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm"
+            >
+              ‹
+            </button>
+          )}
+          {idx < urls.length - 1 && (
+            <button
+              onClick={() => setIdx(idx + 1)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm"
+            >
+              ›
+            </button>
+          )}
+          {/* Dot indicators */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            {urls.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${i === idx ? "bg-white" : "bg-white/40"}`}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -76,15 +109,14 @@ function Caption({ text, className = "text-gray-300" }: { text: string; classNam
 // ---------------------------------------------------------------------------
 // Instagram card
 // ---------------------------------------------------------------------------
-function InstagramCard({ caption, imageUrl, instagramType, dateLabel }: {
-  caption: string; imageUrl?: string; instagramType?: string; dateLabel: string;
+function InstagramCard({ caption, imageUrls, instagramType, dateLabel }: {
+  caption: string; imageUrls: string[]; instagramType?: string; dateLabel: string;
 }) {
   const isStory    = instagramType === "story";
-  const isCarousel = instagramType === "carousel";
+  const isCarousel = instagramType === "carousel" || imageUrls.length > 1;
 
   return (
     <div className="rounded-xl overflow-hidden border border-white/10 bg-[#111] text-white text-sm shadow-xl">
-      {/* Header */}
       <div className="flex items-center gap-2.5 px-3 py-2.5">
         <Avatar size={32} ring />
         <div className="flex-1 min-w-0">
@@ -94,19 +126,13 @@ function InstagramCard({ caption, imageUrl, instagramType, dateLabel }: {
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
       </div>
-
-      {/* Full image */}
-      <PostImage src={imageUrl} isStory={isStory} isCarousel={isCarousel} />
-
-      {/* Actions */}
+      <PostImage urls={imageUrls} isStory={isStory} />
       <div className="flex items-center gap-3.5 px-3 py-2.5">
         <Heart className="h-6 w-6" />
         <MessageCircle className="h-6 w-6" />
         <Send className="h-6 w-6" />
         <Bookmark className="h-6 w-6 ml-auto" />
       </div>
-
-      {/* Caption */}
       <div className="px-3 pb-4 space-y-1.5">
         <p className="text-xs">
           <span className="font-semibold mr-1">actualizateconia</span>
@@ -121,12 +147,11 @@ function InstagramCard({ caption, imageUrl, instagramType, dateLabel }: {
 // ---------------------------------------------------------------------------
 // Facebook card
 // ---------------------------------------------------------------------------
-function FacebookCard({ caption, imageUrl, dateLabel }: {
-  caption: string; imageUrl?: string; dateLabel: string;
+function FacebookCard({ caption, imageUrls, dateLabel }: {
+  caption: string; imageUrls: string[]; dateLabel: string;
 }) {
   return (
     <div className="rounded-xl overflow-hidden border border-white/10 bg-[#18191a] text-white text-sm shadow-xl">
-      {/* Header */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
         <Avatar size={40} />
         <div className="flex-1">
@@ -135,24 +160,16 @@ function FacebookCard({ caption, imageUrl, dateLabel }: {
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
       </div>
-
-      {/* Caption above image (Facebook style) */}
       <div className="px-3 pb-2.5">
         <p className="text-xs text-gray-200 leading-relaxed">
           <Caption text={caption} className="text-gray-200" />
         </p>
       </div>
-
-      {/* Full image */}
-      <PostImage src={imageUrl} />
-
-      {/* Reactions bar */}
+      <PostImage urls={imageUrls} />
       <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-gray-400 border-t border-[#3a3b3c]">
         <span>👍 ❤️ Me gusta</span>
         <span className="flex gap-3"><span>Comentar</span><span>Compartir</span></span>
       </div>
-
-      {/* Action buttons */}
       <div className="flex items-center px-3 pb-2 gap-1 border-t border-[#3a3b3c]">
         {[
           { icon: <ThumbsUp className="h-4 w-4" />, label: "Me gusta" },
@@ -171,12 +188,11 @@ function FacebookCard({ caption, imageUrl, dateLabel }: {
 // ---------------------------------------------------------------------------
 // LinkedIn card
 // ---------------------------------------------------------------------------
-function LinkedInCard({ caption, imageUrl, dateLabel }: {
-  caption: string; imageUrl?: string; dateLabel: string;
+function LinkedInCard({ caption, imageUrls, dateLabel }: {
+  caption: string; imageUrls: string[]; dateLabel: string;
 }) {
   return (
     <div className="rounded-xl overflow-hidden border border-white/10 bg-[#1b1f23] text-white text-sm shadow-xl">
-      {/* Header */}
       <div className="flex items-center gap-2.5 px-4 pt-4 pb-2">
         <Avatar size={44} />
         <div className="flex-1">
@@ -186,24 +202,16 @@ function LinkedInCard({ caption, imageUrl, dateLabel }: {
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
       </div>
-
-      {/* Caption above image (LinkedIn style) */}
       <div className="px-4 pb-3">
         <p className="text-xs text-gray-200 leading-relaxed">
           <Caption text={caption} className="text-gray-200" />
         </p>
       </div>
-
-      {/* Full image */}
-      <PostImage src={imageUrl} />
-
-      {/* Reactions */}
+      <PostImage urls={imageUrls} />
       <div className="px-4 py-1.5 flex items-center justify-between text-[10px] text-gray-500 border-t border-[#2c3036]">
         <span>👍 💡 ❤️ 12</span>
         <span>0 comentarios · 0 reposts</span>
       </div>
-
-      {/* Action buttons */}
       <div className="flex items-center px-2 pb-3 gap-0.5 border-t border-[#2c3036]">
         {[
           { icon: <ThumbsUp className="h-4 w-4" />, label: "Recomendar" },
@@ -223,8 +231,8 @@ function LinkedInCard({ caption, imageUrl, dateLabel }: {
 // ---------------------------------------------------------------------------
 // Generic card (no platform)
 // ---------------------------------------------------------------------------
-function GenericCard({ caption, imageUrl, dateLabel }: {
-  caption: string; imageUrl?: string; dateLabel: string;
+function GenericCard({ caption, imageUrls, dateLabel }: {
+  caption: string; imageUrls: string[]; dateLabel: string;
 }) {
   return (
     <div className="rounded-xl overflow-hidden border border-border bg-card text-foreground text-sm shadow-xl">
@@ -235,7 +243,7 @@ function GenericCard({ caption, imageUrl, dateLabel }: {
           <p className="text-[10px] text-muted-foreground">{dateLabel}</p>
         </div>
       </div>
-      <PostImage src={imageUrl} />
+      <PostImage urls={imageUrls} />
       <div className="px-3 py-3">
         <Caption text={caption} className="text-foreground/80" />
       </div>
@@ -260,7 +268,9 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const tabs: NetworkTab[] = unique.length > 0 ? unique : ["generic"];
   const [activeTab, setActiveTab] = useState<NetworkTab>(tabs[0]);
 
-  const imageUrl = post.post_media?.[0]?.media_asset?.storage_url;
+  const imageUrls = (post.post_media ?? [])
+    .map((pm) => pm.media_asset?.storage_url)
+    .filter((url): url is string => Boolean(url));
 
   const dateLabel = post.scheduled_at
     ? new Date(post.scheduled_at).toLocaleString("es-CL", {
@@ -316,9 +326,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
       : ["linkedin"]) as ("instagram" | "facebook" | "linkedin")[];
 
   const handlePublish = async () => {
-    const mediaUrls = post.post_media?.[0]?.media_asset?.storage_url
-      ? [post.post_media[0].media_asset.storage_url]
-      : undefined;
+    const mediaUrls = imageUrls.length > 0 ? imageUrls : undefined;
     const res = await publish({
       content: post.base_caption,
       platforms: publishPlatforms,
@@ -395,19 +403,19 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
               {activeTab === "instagram" && (
                 <InstagramCard
                   caption={caption}
-                  imageUrl={imageUrl}
+                  imageUrls={imageUrls}
                   instagramType={instagramType}
                   dateLabel={dateLabel}
                 />
               )}
               {activeTab === "facebook" && (
-                <FacebookCard caption={caption} imageUrl={imageUrl} dateLabel={dateLabel} />
+                <FacebookCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />
               )}
               {activeTab === "linkedin" && (
-                <LinkedInCard caption={caption} imageUrl={imageUrl} dateLabel={dateLabel} />
+                <LinkedInCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />
               )}
               {activeTab === "generic" && (
-                <GenericCard caption={caption} imageUrl={imageUrl} dateLabel={dateLabel} />
+                <GenericCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />
               )}
             </>
           ) : (

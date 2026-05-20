@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Upload,
   X,
@@ -1153,13 +1154,21 @@ export function ImportCalendarModal({ onClose }: ImportCalendarModalProps) {
 // ---------------------------------------------------------------------------
 export function ImportCalendarButton() {
   const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+
+  const handleClose = () => {
+    setOpen(false);
+    // Refresh calendar and scheduled views after import
+    qc.invalidateQueries({ queryKey: ["posts"] });
+  };
+
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
         <Upload className="h-4 w-4 mr-2" />
         Importar calendario
       </Button>
-      {open && <ImportCalendarModal onClose={() => setOpen(false)} />}
+      {open && <ImportCalendarModal onClose={handleClose} />}
     </>
   );
 }
