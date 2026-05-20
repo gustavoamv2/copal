@@ -9,7 +9,6 @@ import { CalendarPage } from "@/pages/CalendarPage";
 import { Media } from "@/pages/Media";
 import { Scheduled } from "@/pages/Scheduled";
 import { History } from "@/pages/History";
-import { Accounts } from "@/pages/Accounts";
 import { Settings } from "@/pages/Settings";
 
 const queryClient = new QueryClient({
@@ -35,7 +34,6 @@ export function App() {
               <Route path="/media" element={<Media />} />
               <Route path="/scheduled" element={<Scheduled />} />
               <Route path="/history" element={<History />} />
-              <Route path="/accounts" element={<Accounts />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
           </Routes>

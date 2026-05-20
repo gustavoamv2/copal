@@ -208,8 +208,14 @@ function PostPreviewModal({ pub, onEdit, onClose }: PostPreviewModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-4 pb-3 text-center text-[10px] text-muted-foreground/50">
-          Vista previa ilustrativa · El contenido real puede variar
+        <div className="px-4 pb-4 flex items-center justify-between gap-3 border-t border-border mt-1 pt-3">
+          <p className="text-[10px] text-muted-foreground/50">
+            Vista previa ilustrativa · El contenido real puede variar
+          </p>
+          <Button size="sm" variant="outline" onClick={onEdit} className="shrink-0 gap-1.5">
+            <Pencil className="h-3.5 w-3.5" />
+            Editar
+          </Button>
         </div>
       </div>
     </div>
