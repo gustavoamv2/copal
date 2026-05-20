@@ -5,9 +5,11 @@ import { publicationsApi } from "@/api/publications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
+import { PostDetailModal } from "@/components/PostDetailModal";
 import { toast } from "@/hooks/useToast";
 import { formatDateTime } from "@/lib/utils";
 import { ImportCalendarButton } from "@/components/ImportCalendarModal";
+import type { Post } from "@/types";
 import { Platform, PublicationStatus } from "@/types";
 import { RefreshCw, FileText, Rss } from "lucide-react";
 
@@ -44,6 +46,7 @@ const POST_STATUS_FILTERS = [
 function PostsTab() {
   const qc = useQueryClient();
   const [status, setStatus] = useState("");
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["posts", { status, limit: 100 }],
@@ -95,29 +98,51 @@ function PostsTab() {
             <div className="divide-y divide-border">
               {data.data.map((post) => {
                 const platforms = post.variants.map((v) => v.platform);
+                // Infer platform from title when no variants
+                const inferredPlatform = platforms.length === 0
+                  ? post.title.toLowerCase().includes("instagram") ? "Instagram"
+                    : post.title.toLowerCase().includes("facebook") ? "Facebook"
+                    : post.title.toLowerCase().includes("linkedin") ? "LinkedIn"
+                    : null
+                  : null;
+                // Infer type from title
+                const inferredType = post.title.toLowerCase().includes("story") || post.title.toLowerCase().includes("reel") ? "Story/Reel"
+                  : post.title.toLowerCase().includes("carrusel") || post.title.toLowerCase().includes("carousel") ? "Carrusel"
+                  : platforms.length === 0 ? "Post" : null;
+
                 return (
                   <div
                     key={post.id}
-                    className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors"
+                    className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedPost(post)}
                   >
                     {/* Platform dots */}
                     <div className="flex gap-1 shrink-0">
                       {platforms.length > 0 ? (
                         platforms.map((p, i) => <PlatformDot key={i} platform={p} />)
                       ) : (
-                        <PlatformDot />
+                        <PlatformDot platform={inferredPlatform?.toLowerCase()} />
                       )}
                     </div>
 
                     <div className="flex-1 min-w-0">
+                      {/* Red Social · Tipo · Título */}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5 flex-wrap">
+                        {platforms.length > 0 ? (
+                          <span className="capitalize font-medium text-foreground/70">
+                            {platforms.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" / ")}
+                          </span>
+                        ) : inferredPlatform ? (
+                          <span className="font-medium text-foreground/70">{inferredPlatform}</span>
+                        ) : null}
+                        {(platforms.length > 0 || inferredPlatform) && inferredType && (
+                          <span className="text-muted-foreground/50">·</span>
+                        )}
+                        {inferredType && <span>{inferredType}</span>}
+                      </div>
                       <p className="text-sm font-medium truncate">{post.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {post.scheduled_at ? formatDateTime(post.scheduled_at) : "Sin fecha programada"}
-                        {platforms.length > 0 && (
-                          <span className="ml-2 capitalize text-muted-foreground/70">
-                            {platforms.join(", ")}
-                          </span>
-                        )}
                       </p>
                     </div>
 
@@ -127,7 +152,7 @@ function PostsTab() {
                       variant="ghost"
                       size="sm"
                       className="text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(post.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(post.id); }}
                       disabled={deleteMutation.isPending}
                     >
                       Eliminar
@@ -139,6 +164,10 @@ function PostsTab() {
           )}
         </CardContent>
       </Card>
+
+      {selectedPost && (
+        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      )}
     </div>
   );
 }
