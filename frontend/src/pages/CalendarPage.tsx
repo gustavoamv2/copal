@@ -18,16 +18,28 @@ export function CalendarPage() {
 
   const events = (data?.data ?? [])
     .filter((p) => p.scheduled_at)
-    .flatMap((post) =>
-      post.variants.map((v) => ({
-        id: v.id,
+    .flatMap((post) => {
+      // Posts created with variants (manual new-post flow)
+      if (post.variants.length > 0) {
+        return post.variants.map((v) => ({
+          id: v.id,
+          title: post.title,
+          start: post.scheduled_at!,
+          backgroundColor: PLATFORM_COLORS[v.platform as Platform] ?? "#6366f1",
+          borderColor: "transparent",
+          extendedProps: { platform: v.platform, status: post.status },
+        }));
+      }
+      // Posts without variants (imported from calendar)
+      return [{
+        id: post.id,
         title: post.title,
         start: post.scheduled_at!,
-        backgroundColor: PLATFORM_COLORS[v.platform] ?? "#6366f1",
+        backgroundColor: "#6366f1",
         borderColor: "transparent",
-        extendedProps: { platform: v.platform, status: post.status },
-      }))
-    );
+        extendedProps: { status: post.status },
+      }];
+    });
 
   return (
     <div className="space-y-6">

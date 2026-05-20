@@ -1,24 +1,158 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { postsApi } from "@/api/posts";
 import { publicationsApi } from "@/api/publications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlatformBadge } from "@/components/PlatformBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "@/hooks/useToast";
 import { formatDateTime } from "@/lib/utils";
 import { ImportCalendarButton } from "@/components/ImportCalendarModal";
 import { Platform, PublicationStatus } from "@/types";
+import { RefreshCw, FileText, Rss } from "lucide-react";
 
-const FILTERS: { label: string; value: string }[] = [
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const PLATFORM_COLORS: Record<string, string> = {
+  instagram: "bg-pink-500",
+  facebook: "bg-blue-600",
+  linkedin: "bg-blue-800",
+};
+
+function PlatformDot({ platform }: { platform?: string }) {
+  if (!platform) return <span className="h-2 w-2 rounded-full bg-indigo-500 shrink-0" />;
+  return (
+    <span
+      className={`h-2 w-2 rounded-full shrink-0 ${PLATFORM_COLORS[platform] ?? "bg-indigo-500"}`}
+      title={platform}
+    />
+  );
+}
+
+// ─── Tab types ───────────────────────────────────────────────────────────────
+
+type Tab = "posts" | "jobs";
+
+// ─── Posts tab (imported + manually saved) ───────────────────────────────────
+
+const POST_STATUS_FILTERS = [
+  { label: "Todas", value: "" },
+  { label: "Programadas", value: "scheduled" },
+  { label: "Borrador", value: "draft" },
+];
+
+function PostsTab() {
+  const qc = useQueryClient();
+  const [status, setStatus] = useState("");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["posts", { status, limit: 100 }],
+    queryFn: () =>
+      postsApi.list({ status: status || undefined, limit: 100 }).then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => postsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Publicación eliminada" });
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 flex-wrap">
+        {POST_STATUS_FILTERS.map((f) => (
+          <Button
+            key={f.value}
+            variant={status === f.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatus(f.value)}
+          >
+            {f.label}
+          </Button>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{data?.total ?? 0} publicaciones</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="space-y-px p-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-14 animate-pulse bg-muted/50 mb-2 rounded-md" />
+              ))}
+            </div>
+          ) : !data?.data.length ? (
+            <p className="text-center py-12 text-muted-foreground text-sm">
+              No hay publicaciones con este filtro
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {data.data.map((post) => {
+                const platforms = post.variants.map((v) => v.platform);
+                return (
+                  <div
+                    key={post.id}
+                    className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors"
+                  >
+                    {/* Platform dots */}
+                    <div className="flex gap-1 shrink-0">
+                      {platforms.length > 0 ? (
+                        platforms.map((p, i) => <PlatformDot key={i} platform={p} />)
+                      ) : (
+                        <PlatformDot />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{post.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {post.scheduled_at ? formatDateTime(post.scheduled_at) : "Sin fecha programada"}
+                        {platforms.length > 0 && (
+                          <span className="ml-2 capitalize text-muted-foreground/70">
+                            {platforms.join(", ")}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <StatusBadge status={post.status as PublicationStatus} />
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(post.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Jobs tab (BullMQ via scheduled_publications) ────────────────────────────
+
+const JOB_STATUS_FILTERS = [
   { label: "Todas", value: "" },
   { label: "Pendientes", value: "pending" },
   { label: "Publicadas", value: "published" },
   { label: "Fallidas", value: "failed" },
 ];
 
-export function Scheduled() {
+function JobsTab() {
   const qc = useQueryClient();
   const [status, setStatus] = useState("");
 
@@ -39,17 +173,9 @@ export function Scheduled() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Publicaciones programadas</h1>
-          <p className="text-muted-foreground text-sm mt-1">Estado en tiempo real de tu cola</p>
-        </div>
-        <ImportCalendarButton />
-      </div>
-
+    <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
-        {FILTERS.map((f) => (
+        {JOB_STATUS_FILTERS.map((f) => (
           <Button
             key={f.value}
             variant={status === f.value ? "default" : "outline"}
@@ -63,26 +189,24 @@ export function Scheduled() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {data?.total ?? 0} publicaciones
-          </CardTitle>
+          <CardTitle className="text-base">{data?.total ?? 0} jobs</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="space-y-px">
+            <div className="space-y-px p-4">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-14 animate-pulse bg-muted/50 mx-4 mb-2 rounded-md" />
+                <div key={i} className="h-14 animate-pulse bg-muted/50 mb-2 rounded-md" />
               ))}
             </div>
           ) : !data?.data.length ? (
             <p className="text-center py-12 text-muted-foreground text-sm">
-              No hay publicaciones con este filtro
+              No hay jobs con este filtro
             </p>
           ) : (
             <div className="divide-y divide-border">
               {data.data.map((pub) => (
                 <div key={pub.id} className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors">
-                  <PlatformBadge platform={pub.post_variant?.platform as Platform} />
+                  <PlatformDot platform={pub.post_variant?.platform as Platform} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{pub.post?.title}</p>
                     <p className="text-xs text-muted-foreground">{formatDateTime(pub.publish_at)}</p>
@@ -99,15 +223,65 @@ export function Scheduled() {
                       Reintentar
                     </Button>
                   )}
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {pub.attempt_count > 0 && `${pub.attempt_count} intento(s)`}
-                  </span>
+                  {pub.attempt_count > 0 && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {pub.attempt_count} intento(s)
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
+
+export function Scheduled() {
+  const [tab, setTab] = useState<Tab>("posts");
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Publicaciones programadas</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Gestiona el contenido guardado y los jobs de publicación
+          </p>
+        </div>
+        <ImportCalendarButton />
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 border border-border rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setTab("posts")}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "posts"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          Publicaciones
+        </button>
+        <button
+          onClick={() => setTab("jobs")}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "jobs"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Rss className="h-4 w-4" />
+          Jobs de red social
+        </button>
+      </div>
+
+      {tab === "posts" ? <PostsTab /> : <JobsTab />}
     </div>
   );
 }
