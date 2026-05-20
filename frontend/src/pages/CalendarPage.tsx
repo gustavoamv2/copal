@@ -13,17 +13,36 @@ const PLATFORM_COLORS: Record<Platform, string> = {
   linkedin: "#0A66C2",
 };
 
-// Label shown inside calendar events
+// Extract "Red Social · Tipo" from a post for the calendar chip
 function eventLabel(post: Post): string {
-  if (post.variants.length === 0) return post.title;
-  const networks = Array.from(new Set(post.variants.map((v) => {
-    switch (v.platform) {
-      case "instagram": return "Instagram";
-      case "facebook": return "Facebook";
-      case "linkedin": return "LinkedIn";
-    }
-  })));
-  return `${networks.join("/")} · ${post.title}`;
+  // Posts with variants (manual flow)
+  if (post.variants.length > 0) {
+    const networks = Array.from(
+      new Set(post.variants.map((v) => {
+        switch (v.platform) {
+          case "instagram": return "Instagram";
+          case "facebook":  return "Facebook";
+          case "linkedin":  return "LinkedIn";
+        }
+      }))
+    );
+    return networks.join(" / ");
+  }
+
+  // Imported posts: title is "YYYY-MM-DD - Network - Description"
+  // Extract network and type from the title
+  const t = post.title;
+
+  const network = t.includes("LinkedIn")  ? "LinkedIn"
+    : t.includes("Facebook")  ? "Facebook"
+    : t.includes("Instagram") ? "Instagram"
+    : "—";
+
+  const type = t.includes("Story") || t.includes("Reel") ? "Story/Reel"
+    : t.toLowerCase().includes("carrusel") || t.toLowerCase().includes("carousel") ? "Carrusel"
+    : "Post";
+
+  return `${network} · ${type}`;
 }
 
 export function CalendarPage() {
@@ -36,33 +55,34 @@ export function CalendarPage() {
 
   const posts = data?.data ?? [];
 
-  // Build FullCalendar events; store post id in extendedProps
   const events = posts
     .filter((p) => p.scheduled_at)
     .flatMap((post) => {
+      const label = eventLabel(post);
+
       if (post.variants.length > 0) {
-        // One event per unique platform
         const seen = new Set<string>();
         return post.variants
-          .filter((v) => { const k = v.platform; const dup = seen.has(k); seen.add(k); return !dup; })
+          .filter((v) => { const dup = seen.has(v.platform); seen.add(v.platform); return !dup; })
           .map((v) => ({
             id: `${post.id}_${v.platform}`,
-            title: eventLabel(post),
+            title: label,
             start: post.scheduled_at!,
             backgroundColor: PLATFORM_COLORS[v.platform as Platform] ?? "#6366f1",
             borderColor: "transparent",
             extendedProps: { postId: post.id },
           }));
       }
-      // Imported post without variants — derive color from title heuristic
+
       const t = post.title.toLowerCase();
       const bg = t.includes("instagram") ? "#E1306C"
         : t.includes("facebook") ? "#1877F2"
         : t.includes("linkedin") ? "#0A66C2"
         : "#6366f1";
+
       return [{
         id: post.id,
-        title: post.title,
+        title: label,
         start: post.scheduled_at!,
         backgroundColor: bg,
         borderColor: "transparent",
@@ -72,8 +92,7 @@ export function CalendarPage() {
 
   const handleEventClick = (info: EventClickArg) => {
     const postId = info.event.extendedProps.postId as string;
-    const post = posts.find((p) => p.id === postId) ?? null;
-    setSelectedPost(post);
+    setSelectedPost(posts.find((p) => p.id === postId) ?? null);
   };
 
   return (
@@ -90,11 +109,7 @@ export function CalendarPage() {
           events={events}
           locale="es"
           height="auto"
-          headerToolbar={{
-            left: "prev,next today",
-            center: "title",
-            right: "",
-          }}
+          headerToolbar={{ left: "prev,next today", center: "title", right: "" }}
           buttonText={{ today: "Hoy" }}
           eventDisplay="block"
           eventClick={handleEventClick}
@@ -102,10 +117,7 @@ export function CalendarPage() {
       </div>
 
       {selectedPost && (
-        <PostDetailModal
-          post={selectedPost}
-          onClose={() => setSelectedPost(null)}
-        />
+        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
       )}
     </div>
   );

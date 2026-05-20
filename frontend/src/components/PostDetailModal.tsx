@@ -1,17 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  X,
-  Pencil,
-  Check,
-  Heart,
-  MessageCircle,
-  Send,
-  Bookmark,
-  ThumbsUp,
-  Share2,
-  MoreHorizontal,
-  ChevronLeft,
+  X, Pencil, Check, Heart, MessageCircle, Send,
+  Bookmark, ThumbsUp, Share2, MoreHorizontal, ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,19 +12,57 @@ import { postsApi } from "@/api/posts";
 import { toast } from "@/hooks/useToast";
 import type { Post, Platform } from "@/types";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-type ViewMode = "preview" | "edit";
+type ViewMode  = "preview" | "edit";
 type NetworkTab = Platform | "generic";
 
 // ---------------------------------------------------------------------------
-// Avatar placeholder
+// Shared image block — shows the full image, no crop, black letterbox
 // ---------------------------------------------------------------------------
-function AvatarPlaceholder({ size = 9 }: { size?: number }) {
+function PostImage({ src, isStory, isCarousel }: { src?: string; isStory?: boolean; isCarousel?: boolean }) {
+  if (!src) {
+    return (
+      <div className={`w-full bg-[#222] flex items-center justify-center text-gray-500 text-xs ${isStory ? "min-h-[320px]" : "min-h-[200px]"}`}>
+        Sin imagen
+      </div>
+    );
+  }
+  return (
+    <div className="relative w-full bg-black">
+      <img
+        src={src}
+        alt=""
+        className="w-full block object-contain"
+        style={{ maxHeight: isStory ? "520px" : "480px" }}
+      />
+      {isCarousel && (
+        <span className="absolute top-2 right-2 bg-black/60 text-white rounded-full px-2 py-0.5 text-[10px]">
+          1 / 3
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Avatar
+// ---------------------------------------------------------------------------
+function Avatar({ size = 36, ring = false }: { size?: number; ring?: boolean }) {
+  const style = { width: size, height: size };
+  if (ring) {
+    return (
+      <div
+        style={style}
+        className="rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px] shrink-0"
+      >
+        <div className="h-full w-full rounded-full bg-[#111] flex items-center justify-center text-xs font-bold text-white">
+          M
+        </div>
+      </div>
+    );
+  }
   return (
     <div
-      style={{ width: `${size * 4}px`, height: `${size * 4}px` }}
+      style={style}
       className="rounded-full bg-gradient-to-br from-primary/80 to-primary/40 flex items-center justify-center text-primary-foreground font-bold text-xs shrink-0"
     >
       M
@@ -42,62 +71,62 @@ function AvatarPlaceholder({ size = 9 }: { size?: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Instagram preview
+// Caption with expand
 // ---------------------------------------------------------------------------
-function InstagramCard({
-  caption,
-  imageUrl,
-  instagramType,
-  dateLabel,
-}: {
-  caption: string;
-  imageUrl?: string;
-  instagramType?: string;
-  dateLabel: string;
-}) {
-  const isStory = instagramType === "story";
-  const isCarousel = instagramType === "carousel";
+function Caption({ text, className = "text-gray-300" }: { text: string; className?: string }) {
   const [expanded, setExpanded] = useState(false);
-  const short = caption.length > 280 && !expanded ? caption.slice(0, 280) + "…" : caption;
+  const LIMIT = 300;
+  const short = text.length > LIMIT && !expanded ? text.slice(0, LIMIT) + "…" : text;
+  return (
+    <span className={`whitespace-pre-wrap break-words leading-relaxed ${className}`}>
+      {short}
+      {text.length > LIMIT && !expanded && (
+        <button className="text-gray-500 ml-1 text-xs" onClick={() => setExpanded(true)}>
+          más
+        </button>
+      )}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Instagram card
+// ---------------------------------------------------------------------------
+function InstagramCard({ caption, imageUrl, instagramType, dateLabel }: {
+  caption: string; imageUrl?: string; instagramType?: string; dateLabel: string;
+}) {
+  const isStory    = instagramType === "story";
+  const isCarousel = instagramType === "carousel";
 
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-[#111] text-white text-sm shadow-md">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px] shrink-0">
-          <div className="h-full w-full rounded-full bg-[#111] flex items-center justify-center text-xs font-bold">M</div>
-        </div>
+    <div className="rounded-xl overflow-hidden border border-white/10 bg-[#111] text-white text-sm shadow-xl">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-3 py-2.5">
+        <Avatar size={32} ring />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold">tu_marca</p>
-          {isStory && <p className="text-[10px] text-gray-400">Historia</p>}
+          <p className="text-xs font-semibold leading-tight">tu_marca</p>
+          {isStory    && <p className="text-[10px] text-gray-400">Historia</p>}
           {isCarousel && <p className="text-[10px] text-gray-400">Carrusel</p>}
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
       </div>
 
-      {imageUrl ? (
-        <div className={`w-full bg-black ${isStory ? "aspect-[9/16]" : "aspect-square"} overflow-hidden relative`}>
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-          {isCarousel && (
-            <div className="absolute top-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-[10px]">1 / 3</div>
-          )}
-        </div>
-      ) : (
-        <div className={`w-full bg-[#222] ${isStory ? "aspect-[9/16]" : "aspect-square"} flex items-center justify-center text-gray-600 text-xs`}>
-          Sin imagen
-        </div>
-      )}
+      {/* Full image */}
+      <PostImage src={imageUrl} isStory={isStory} isCarousel={isCarousel} />
 
-      <div className="flex items-center gap-3 px-3 py-2">
-        <Heart className="h-5 w-5" /><MessageCircle className="h-5 w-5" /><Send className="h-5 w-5" />
-        <Bookmark className="h-5 w-5 ml-auto" />
+      {/* Actions */}
+      <div className="flex items-center gap-3.5 px-3 py-2.5">
+        <Heart className="h-6 w-6" />
+        <MessageCircle className="h-6 w-6" />
+        <Send className="h-6 w-6" />
+        <Bookmark className="h-6 w-6 ml-auto" />
       </div>
 
-      <div className="px-3 pb-3 space-y-1">
-        <p className="text-xs font-semibold">tu_marca{" "}
-          <span className="font-normal text-gray-300 whitespace-pre-wrap break-words">{short}</span>
-          {caption.length > 280 && !expanded && (
-            <button className="text-gray-500 ml-1" onClick={() => setExpanded(true)}>más</button>
-          )}
+      {/* Caption */}
+      <div className="px-3 pb-4 space-y-1.5">
+        <p className="text-xs">
+          <span className="font-semibold mr-1">tu_marca</span>
+          <Caption text={caption} className="text-gray-200" />
         </p>
         <p className="text-[10px] text-gray-500 uppercase tracking-wide">{dateLabel}</p>
       </div>
@@ -106,42 +135,46 @@ function InstagramCard({
 }
 
 // ---------------------------------------------------------------------------
-// Facebook preview
+// Facebook card
 // ---------------------------------------------------------------------------
-function FacebookCard({ caption, imageUrl, dateLabel }: { caption: string; imageUrl?: string; dateLabel: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const short = caption.length > 280 && !expanded ? caption.slice(0, 280) + "…" : caption;
-
+function FacebookCard({ caption, imageUrl, dateLabel }: {
+  caption: string; imageUrl?: string; dateLabel: string;
+}) {
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-[#18191a] text-white text-sm shadow-md">
-      <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <AvatarPlaceholder size={9} />
+    <div className="rounded-xl overflow-hidden border border-white/10 bg-[#18191a] text-white text-sm shadow-xl">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+        <Avatar size={40} />
         <div className="flex-1">
-          <p className="text-xs font-semibold">Tu Marca</p>
+          <p className="text-xs font-semibold leading-tight">Tu Marca</p>
           <p className="text-[10px] text-gray-400">{dateLabel} · 🌐</p>
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
       </div>
-      <div className="px-3 pb-2">
-        <p className="text-xs text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{short}
-          {caption.length > 280 && !expanded && (
-            <button className="text-blue-400 ml-1" onClick={() => setExpanded(true)}>Ver más</button>
-          )}
+
+      {/* Caption above image (Facebook style) */}
+      <div className="px-3 pb-2.5">
+        <p className="text-xs text-gray-200 leading-relaxed">
+          <Caption text={caption} className="text-gray-200" />
         </p>
       </div>
-      {imageUrl ? (
-        <div className="w-full aspect-video bg-black overflow-hidden">
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <div className="w-full aspect-video bg-[#3a3b3c] flex items-center justify-center text-gray-500 text-xs">Sin imagen</div>
-      )}
-      <div className="flex items-center justify-between px-3 py-2 text-gray-400 text-[11px] border-t border-[#3a3b3c]">
-        <span>👍 ❤️ <span className="text-gray-500">Me gusta</span></span>
+
+      {/* Full image */}
+      <PostImage src={imageUrl} />
+
+      {/* Reactions bar */}
+      <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-gray-400 border-t border-[#3a3b3c]">
+        <span>👍 ❤️ Me gusta</span>
         <span className="flex gap-3"><span>Comentar</span><span>Compartir</span></span>
       </div>
+
+      {/* Action buttons */}
       <div className="flex items-center px-3 pb-2 gap-1 border-t border-[#3a3b3c]">
-        {[{ icon: <ThumbsUp className="h-4 w-4" />, label: "Me gusta" }, { icon: <MessageCircle className="h-4 w-4" />, label: "Comentar" }, { icon: <Share2 className="h-4 w-4" />, label: "Compartir" }].map(({ icon, label }) => (
+        {[
+          { icon: <ThumbsUp className="h-4 w-4" />, label: "Me gusta" },
+          { icon: <MessageCircle className="h-4 w-4" />, label: "Comentar" },
+          { icon: <Share2 className="h-4 w-4" />, label: "Compartir" },
+        ].map(({ icon, label }) => (
           <button key={label} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-gray-400 hover:bg-[#3a3b3c] rounded-md">
             {icon} {label}
           </button>
@@ -152,41 +185,48 @@ function FacebookCard({ caption, imageUrl, dateLabel }: { caption: string; image
 }
 
 // ---------------------------------------------------------------------------
-// LinkedIn preview
+// LinkedIn card
 // ---------------------------------------------------------------------------
-function LinkedInCard({ caption, imageUrl, dateLabel }: { caption: string; imageUrl?: string; dateLabel: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const short = caption.length > 280 && !expanded ? caption.slice(0, 280) + "…" : caption;
-
+function LinkedInCard({ caption, imageUrl, dateLabel }: {
+  caption: string; imageUrl?: string; dateLabel: string;
+}) {
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-[#1b1f23] text-white text-sm shadow-md">
+    <div className="rounded-xl overflow-hidden border border-white/10 bg-[#1b1f23] text-white text-sm shadow-xl">
+      {/* Header */}
       <div className="flex items-center gap-2.5 px-4 pt-4 pb-2">
-        <AvatarPlaceholder size={10} />
+        <Avatar size={44} />
         <div className="flex-1">
-          <p className="text-xs font-semibold">Tu Marca</p>
-          <p className="text-[10px] text-gray-400">Empresa · {dateLabel} · 🌐</p>
+          <p className="text-xs font-semibold leading-tight">Tu Marca</p>
+          <p className="text-[10px] text-gray-400">Empresa · {dateLabel}</p>
+          <p className="text-[10px] text-gray-500">🌐 Para todos</p>
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
       </div>
+
+      {/* Caption above image (LinkedIn style) */}
       <div className="px-4 pb-3">
-        <p className="text-xs text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{short}
-          {caption.length > 280 && !expanded && (
-            <button className="text-[#70b5f9] ml-1" onClick={() => setExpanded(true)}>...más</button>
-          )}
+        <p className="text-xs text-gray-200 leading-relaxed">
+          <Caption text={caption} className="text-gray-200" />
         </p>
       </div>
-      {imageUrl ? (
-        <div className="w-full aspect-video bg-black overflow-hidden">
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <div className="w-full aspect-video bg-[#2c3036] flex items-center justify-center text-gray-500 text-xs">Sin imagen</div>
-      )}
-      <div className="px-4 py-2 flex items-center justify-between text-[10px] text-gray-500 border-t border-[#2c3036]">
-        <span>👍 💡 ❤️</span><span>0 comentarios</span>
+
+      {/* Full image */}
+      <PostImage src={imageUrl} />
+
+      {/* Reactions */}
+      <div className="px-4 py-1.5 flex items-center justify-between text-[10px] text-gray-500 border-t border-[#2c3036]">
+        <span>👍 💡 ❤️ 12</span>
+        <span>0 comentarios · 0 reposts</span>
       </div>
+
+      {/* Action buttons */}
       <div className="flex items-center px-2 pb-3 gap-0.5 border-t border-[#2c3036]">
-        {[{ icon: <ThumbsUp className="h-4 w-4" />, label: "Recomendar" }, { icon: <MessageCircle className="h-4 w-4" />, label: "Comentar" }, { icon: <Share2 className="h-4 w-4" />, label: "Compartir" }, { icon: <Send className="h-4 w-4" />, label: "Enviar" }].map(({ icon, label }) => (
+        {[
+          { icon: <ThumbsUp className="h-4 w-4" />, label: "Recomendar" },
+          { icon: <MessageCircle className="h-4 w-4" />, label: "Comentar" },
+          { icon: <Share2 className="h-4 w-4" />, label: "Compartir" },
+          { icon: <Send className="h-4 w-4" />, label: "Enviar" },
+        ].map(({ icon, label }) => (
           <button key={label} className="flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] text-gray-400 hover:bg-[#2c3036] rounded-md">
             {icon} {label}
           </button>
@@ -197,34 +237,23 @@ function LinkedInCard({ caption, imageUrl, dateLabel }: { caption: string; image
 }
 
 // ---------------------------------------------------------------------------
-// Generic preview (no platform info)
+// Generic card (no platform)
 // ---------------------------------------------------------------------------
-function GenericCard({ caption, imageUrl, dateLabel }: { caption: string; imageUrl?: string; dateLabel: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const short = caption.length > 280 && !expanded ? caption.slice(0, 280) + "…" : caption;
-
+function GenericCard({ caption, imageUrl, dateLabel }: {
+  caption: string; imageUrl?: string; dateLabel: string;
+}) {
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-card text-foreground text-sm shadow-md">
+    <div className="rounded-xl overflow-hidden border border-border bg-card text-foreground text-sm shadow-xl">
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <AvatarPlaceholder size={9} />
+        <Avatar size={36} />
         <div className="flex-1">
           <p className="text-xs font-semibold">Tu Marca</p>
           <p className="text-[10px] text-muted-foreground">{dateLabel}</p>
         </div>
       </div>
-      {imageUrl ? (
-        <div className="w-full aspect-video overflow-hidden">
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <div className="w-full aspect-video bg-muted flex items-center justify-center text-muted-foreground text-xs">Sin imagen</div>
-      )}
+      <PostImage src={imageUrl} />
       <div className="px-3 py-3">
-        <p className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed">{short}
-          {caption.length > 280 && !expanded && (
-            <button className="text-primary ml-1" onClick={() => setExpanded(true)}>Ver más</button>
-          )}
-        </p>
+        <Caption text={caption} className="text-foreground/80" />
       </div>
     </div>
   );
@@ -242,13 +271,11 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<ViewMode>("preview");
 
-  // Determine available network tabs
-  const platforms = post.variants.map((v) => v.platform as Platform);
-  const uniquePlatforms = Array.from(new Set(platforms));
-  const tabs: NetworkTab[] = uniquePlatforms.length > 0 ? uniquePlatforms : ["generic"];
+  const platforms    = post.variants.map((v) => v.platform as Platform);
+  const unique       = Array.from(new Set(platforms));
+  const tabs: NetworkTab[] = unique.length > 0 ? unique : ["generic"];
   const [activeTab, setActiveTab] = useState<NetworkTab>(tabs[0]);
 
-  // Image from first media asset
   const imageUrl = post.post_media?.[0]?.media_asset?.storage_url;
 
   const dateLabel = post.scheduled_at
@@ -258,12 +285,16 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
       })
     : "Sin fecha";
 
+  // Detect instagram type from title
+  const titleLower = post.title.toLowerCase();
+  const instagramType = titleLower.includes("story") || titleLower.includes("reel") ? "story"
+    : titleLower.includes("carrusel") || titleLower.includes("carousel") ? "carousel"
+    : "feed";
+
   // Edit state
-  const [title, setTitle] = useState(post.title);
-  const [caption, setCaption] = useState(post.base_caption);
-  const [scheduledAt, setScheduledAt] = useState(
-    post.scheduled_at ? post.scheduled_at.slice(0, 16) : ""
-  );
+  const [title,       setTitle]       = useState(post.title);
+  const [caption,     setCaption]     = useState(post.base_caption);
+  const [scheduledAt, setScheduledAt] = useState(post.scheduled_at?.slice(0, 16) ?? "");
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -280,31 +311,24 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
-  // Current caption for preview (use edited if in edit mode)
-  const previewCaption = mode === "edit" ? caption : post.base_caption;
-
-  const TAB_LABELS: Record<NetworkTab, string> = {
-    instagram: "Instagram",
-    facebook: "Facebook",
-    linkedin: "LinkedIn",
-    generic: "Vista previa",
-  };
-
-  const NETWORK_TAB_COLORS: Record<NetworkTab, string> = {
+  const TAB_COLORS: Record<NetworkTab, string> = {
     instagram: "bg-pink-600 text-white border-transparent",
-    facebook: "bg-blue-700 text-white border-transparent",
-    linkedin: "bg-blue-900 text-white border-transparent",
-    generic: "bg-primary text-primary-foreground border-transparent",
+    facebook:  "bg-blue-700 text-white border-transparent",
+    linkedin:  "bg-blue-900 text-white border-transparent",
+    generic:   "bg-primary text-primary-foreground border-transparent",
+  };
+  const TAB_LABELS: Record<NetworkTab, string> = {
+    instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", generic: "Vista previa",
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-background border border-border rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-background border border-border rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[92vh]">
 
-        {/* Header */}
+        {/* ── Header ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             {mode === "edit" && (
@@ -325,7 +349,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           </button>
         </div>
 
-        {/* Network tabs */}
+        {/* ── Network tabs (preview mode only) ───────────────── */}
         {tabs.length > 1 && mode === "preview" && (
           <div className="flex gap-1 px-4 pt-3 shrink-0">
             {tabs.map((t) => (
@@ -333,9 +357,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                 key={t}
                 onClick={() => setActiveTab(t)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  activeTab === t
-                    ? NETWORK_TAB_COLORS[t]
-                    : "border-border text-muted-foreground hover:border-border/60"
+                  activeTab === t ? TAB_COLORS[t] : "border-border text-muted-foreground hover:border-border/60"
                 }`}
               >
                 {TAB_LABELS[t]}
@@ -344,43 +366,40 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           </div>
         )}
 
-        {/* Scrollable content */}
+        {/* ── Scrollable body ─────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {mode === "preview" ? (
             <>
               {activeTab === "instagram" && (
                 <InstagramCard
-                  caption={previewCaption}
+                  caption={caption}
                   imageUrl={imageUrl}
+                  instagramType={instagramType}
                   dateLabel={dateLabel}
                 />
               )}
               {activeTab === "facebook" && (
-                <FacebookCard caption={previewCaption} imageUrl={imageUrl} dateLabel={dateLabel} />
+                <FacebookCard caption={caption} imageUrl={imageUrl} dateLabel={dateLabel} />
               )}
               {activeTab === "linkedin" && (
-                <LinkedInCard caption={previewCaption} imageUrl={imageUrl} dateLabel={dateLabel} />
+                <LinkedInCard caption={caption} imageUrl={imageUrl} dateLabel={dateLabel} />
               )}
               {activeTab === "generic" && (
-                <GenericCard caption={previewCaption} imageUrl={imageUrl} dateLabel={dateLabel} />
+                <GenericCard caption={caption} imageUrl={imageUrl} dateLabel={dateLabel} />
               )}
             </>
           ) : (
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">Título interno</Label>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="text-sm"
-                />
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} className="text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Caption</Label>
                 <Textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  rows={8}
+                  rows={9}
                   className="text-sm resize-none"
                 />
               </div>
@@ -397,21 +416,18 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* ── Footer ─────────────────────────────────────────── */}
         <div className="px-4 pb-4 pt-3 border-t border-border flex items-center justify-between gap-3 shrink-0">
           <p className="text-[10px] text-muted-foreground/50">
             {mode === "preview" ? "Vista previa ilustrativa" : "Los cambios se guardan en la base de datos"}
           </p>
           {mode === "preview" ? (
             <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5 shrink-0">
-              <Pencil className="h-3.5 w-3.5" />
-              Editar
+              <Pencil className="h-3.5 w-3.5" /> Editar
             </Button>
           ) : (
             <div className="flex gap-2 shrink-0">
-              <Button size="sm" variant="outline" onClick={() => setMode("preview")}>
-                Cancelar
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => setMode("preview")}>Cancelar</Button>
               <Button
                 size="sm"
                 onClick={() => updateMutation.mutate()}
