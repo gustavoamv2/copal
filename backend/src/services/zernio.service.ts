@@ -55,7 +55,8 @@ class ZernioService {
         body: JSON.stringify(body),
       });
 
-      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await response.json() as any;
 
       if (!response.ok) {
         return {
@@ -92,7 +93,8 @@ class ZernioService {
         headers: this.headers,
       });
 
-      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await response.json() as any;
 
       if (!response.ok) {
         return { success: false, error: data.message || `Error HTTP ${response.status}` };
@@ -116,7 +118,8 @@ class ZernioService {
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await response.json() as any;
         return { success: false, error: data.message || `Error HTTP ${response.status}` };
       }
 

@@ -55,14 +55,6 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
   {
     connection,
     concurrency: 3,
-    // Reintentos con backoff exponencial
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 5000, // 5s, 10s, 20s
-      },
-    },
   }
 );
 
