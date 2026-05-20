@@ -100,9 +100,10 @@ export function NewPost() {
   const handlePublishNow = async () => {
     if (!baseCaption || ayrPlatforms.length === 0) return;
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls });
+    const scheduledIso = scheduledAt ? new Date(scheduledAt).toISOString() : undefined;
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso });
     if (res.success) {
-      toast({ title: "Publicado en redes sociales ✓" });
+      toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
       toast({ title: res.error ?? "Error al publicar", variant: "destructive" });
     }
@@ -346,7 +347,11 @@ export function NewPost() {
               disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
               onClick={handlePublishNow}
             >
-              {publishing ? "Publicando..." : "Publicar ahora"}
+              {publishing
+                ? "Procesando..."
+                : scheduledAt
+                ? "Programar publicación"
+                : "Publicar ahora"}
             </Button>
           </div>
         </div>
