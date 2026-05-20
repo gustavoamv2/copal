@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   X, Pencil, Check, Heart, MessageCircle, Send,
   Bookmark, ThumbsUp, Share2, MoreHorizontal, ChevronLeft,
+  Trash2, Zap,
 } from "lucide-react";
 import { BrandAvatar } from "@/components/BrandAvatar";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { postsApi } from "@/api/posts";
+import { useSocialPublish } from "@/hooks/useSocialPublish";
 import { toast } from "@/hooks/useToast";
 import type { Post, Platform } from "@/types";
 
@@ -293,6 +295,44 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => postsApi.delete(post.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Publicación eliminada" });
+      onClose();
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Publish now
+  const { publish, loading: publishing } = useSocialPublish();
+  const publishPlatforms = unique.length > 0
+    ? unique.filter((p): p is "instagram" | "facebook" | "linkedin" => p !== "generic") as ("instagram" | "facebook" | "linkedin")[]
+    : (titleLower.includes("instagram") ? ["instagram"]
+      : titleLower.includes("facebook") ? ["facebook"]
+      : ["linkedin"]) as ("instagram" | "facebook" | "linkedin")[];
+
+  const handlePublish = async () => {
+    const mediaUrls = post.post_media?.[0]?.media_asset?.storage_url
+      ? [post.post_media[0].media_asset.storage_url]
+      : undefined;
+    const res = await publish({
+      content: post.base_caption,
+      platforms: publishPlatforms,
+      mediaUrls,
+      instagramType: instagramType as "feed" | "story" | "carousel",
+    });
+    if (res.success) {
+      toast({ title: "¡Publicado correctamente!" });
+      onClose();
+    } else {
+      toast({ title: res.error ?? "Error al publicar", variant: "destructive" });
+    }
+  };
+
   const TAB_COLORS: Record<NetworkTab, string> = {
     instagram: "bg-pink-600 text-white border-transparent",
     facebook:  "bg-blue-700 text-white border-transparent",
@@ -399,31 +439,74 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
         </div>
 
         {/* ── Footer ─────────────────────────────────────────── */}
-        <div className="px-4 pb-4 pt-3 border-t border-border flex items-center justify-between gap-3 shrink-0">
-          <p className="text-[10px] text-muted-foreground/50">
-            {mode === "preview" ? "Vista previa ilustrativa" : "Los cambios se guardan en la base de datos"}
-          </p>
+        <div className="px-4 pb-4 pt-3 border-t border-border shrink-0 space-y-2">
           {mode === "preview" ? (
-            <div className="flex gap-2 shrink-0">
-              <Button size="sm" variant="ghost" onClick={onClose}>
-                Cerrar
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5">
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </Button>
-            </div>
+            <>
+              {/* Delete confirm row */}
+              {confirmDelete && (
+                <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2">
+                  <p className="text-xs text-destructive flex-1">¿Eliminar esta publicación?</p>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirmDelete(false)}>
+                    No
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => deleteMutation.mutate()}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {deleteMutation.isPending ? "Eliminando..." : "Sí, eliminar"}
+                  </Button>
+                </div>
+              )}
+
+              {/* Action buttons row */}
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                </Button>
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" variant="ghost" onClick={onClose}>
+                    Cerrar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5">
+                    <Pencil className="h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={handlePublish}
+                    disabled={publishing}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    {publishing ? "Publicando..." : "Publicar"}
+                  </Button>
+                </div>
+              </div>
+            </>
           ) : (
-            <div className="flex gap-2 shrink-0">
-              <Button size="sm" variant="outline" onClick={() => setMode("preview")}>Cancelar</Button>
-              <Button
-                size="sm"
-                onClick={() => updateMutation.mutate()}
-                disabled={updateMutation.isPending || !title.trim()}
-                className="gap-1.5"
-              >
-                <Check className="h-3.5 w-3.5" />
-                {updateMutation.isPending ? "Guardando..." : "Guardar"}
-              </Button>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] text-muted-foreground/50">Los cambios se guardan en la base de datos</p>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={() => setMode("preview")}>Cancelar</Button>
+                <Button
+                  size="sm"
+                  onClick={() => updateMutation.mutate()}
+                  disabled={updateMutation.isPending || !title.trim()}
+                  className="gap-1.5"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {updateMutation.isPending ? "Guardando..." : "Guardar"}
+                </Button>
+              </div>
             </div>
           )}
         </div>
