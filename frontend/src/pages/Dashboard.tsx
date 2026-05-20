@@ -76,14 +76,17 @@ export function Dashboard() {
     queryKey: ["posts", { status: "scheduled", limit: 20 }],
     queryFn: () => postsApi.list({ status: "scheduled", limit: 20 }).then((r) => r.data),
     refetchInterval: 30_000,
-    select: (d) => ({
-      ...d,
-      // Sort by scheduled_at ascending (soonest first), take top 5
-      data: [...d.data]
-        .filter((p) => p.scheduled_at)
-        .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
-        .slice(0, 5),
-    }),
+    select: (d) => {
+      const now = new Date();
+      return {
+        ...d,
+        // Only show posts scheduled from now onwards, soonest first
+        data: [...d.data]
+          .filter((p) => p.scheduled_at && new Date(p.scheduled_at) >= now)
+          .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
+          .slice(0, 5),
+      };
+    },
   });
 
   return (
