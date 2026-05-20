@@ -50,9 +50,10 @@ export function validatePublication(raw: RawPublication): ValidationResult {
     ...(raw.redes ?? []),
     ...(raw.red_social ? [raw.red_social] : []),
   ];
-  const validFound = allNetworks.some((n) =>
-    VALID_NETWORKS.includes(n as ImportNetwork)
-  );
+  const validFound = allNetworks.some((n) => {
+    const lower = n.toLowerCase();
+    return lower.includes("instagram") || lower.includes("facebook") || lower.includes("linkedin");
+  });
   if (!validFound) {
     errors.push("Debe tener al menos una red social válida (Facebook, Instagram, LinkedIn)");
   }
