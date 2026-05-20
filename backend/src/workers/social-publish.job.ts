@@ -4,7 +4,7 @@
 
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { zernioService, SocialPlatform } from '../services/zernio.service';
+import { ayrshareService, SocialPlatform } from '../services/ayrshare.service';
 import { config } from '../config';
 
 export interface SocialPublishJobData {
@@ -26,7 +26,7 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
 
     console.log(`[SocialPublish] Procesando post ${postId} para: ${platforms.join(', ')}`);
 
-    const result = await zernioService.publish({
+    const result = await ayrshareService.publish({
       content,
       platforms,
       mediaUrls,

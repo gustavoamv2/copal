@@ -4,7 +4,7 @@
 import { Router, Request, Response } from 'express';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
-import { zernioService, SocialPlatform } from '../services/zernio.service';
+import { ayrshareService, SocialPlatform } from '../services/ayrshare.service';
 import type { SocialPublishJobData } from '../workers/social-publish.job';
 import { config } from '../config';
 
@@ -126,7 +126,7 @@ router.post('/schedule', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 router.get('/history', async (_req: Request, res: Response) => {
   try {
-    const result = await zernioService.getHistory(20);
+    const result = await ayrshareService.getHistory(20);
 
     if (!result.success) {
       return res.status(500).json({ error: result.error });
@@ -165,7 +165,7 @@ router.get('/job/:jobId', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 router.delete('/post/:postId', async (req: Request, res: Response) => {
   try {
-    const result = await zernioService.deletePost(req.params.postId);
+    const result = await ayrshareService.deletePost(req.params.postId);
 
     if (!result.success) {
       return res.status(500).json({ error: result.error });
