@@ -10,6 +10,7 @@ import { toast } from "@/hooks/useToast";
 import { formatDate } from "@/lib/utils";
 import { Platform } from "@/types";
 import { getAccessToken } from "@/api/client";
+import axios from "axios";
 
 const PLATFORMS: { key: Platform; name: string; description: string }[] = [
   { key: "facebook", name: "Facebook Pages", description: "Publica en páginas de Facebook" },
@@ -73,11 +74,24 @@ export function Accounts() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const endpoint = key === "linkedin" ? "linkedin" : "meta";
-                    const token = getAccessToken();
-                    window.location.href = `${import.meta.env.VITE_API_URL}/api/oauth/${endpoint}/connect?token=${token}`;
-                  }}
+                  onClick={async () => {
+  const endpoint = key === "linkedin" ? "linkedin" : "meta";
+  let token = getAccessToken();
+  if (!token) {
+    try {
+      const { data } = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
+      token = data.access_token;
+    } catch {
+      window.location.href = "/login";
+      return;
+    }
+  }
+  window.location.href = `${import.meta.env.VITE_API_URL}/api/oauth/${endpoint}/connect?token=${token}`;
+}}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   {connected.length ? "Reconectar" : "Conectar"}
