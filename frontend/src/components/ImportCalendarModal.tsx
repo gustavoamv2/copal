@@ -9,6 +9,14 @@ import {
   Search,
   Download,
   Calendar,
+  Pencil,
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark,
+  ThumbsUp,
+  Share2,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +84,327 @@ function ValidationBadge({ pub }: { pub: ImportedPublication }) {
     <span className="inline-flex items-center gap-1 text-xs text-green-500">
       <Check className="h-3 w-3" />
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Post Preview Modal
+// ---------------------------------------------------------------------------
+interface PostPreviewModalProps {
+  pub: ImportedPublication;
+  onEdit: () => void;
+  onClose: () => void;
+}
+
+function PostPreviewModal({ pub, onEdit, onClose }: PostPreviewModalProps) {
+  const [activeNetwork, setActiveNetwork] = useState<ImportNetwork>(pub.networks[0] ?? "Instagram");
+
+  const imageUrl = pub.imageFile
+    ? URL.createObjectURL(pub.imageFile)
+    : pub.imageUrl ?? null;
+
+  const dateLabel = pub.scheduledAt
+    ? new Date(pub.scheduledAt).toLocaleString("es-CL", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Sin fecha";
+
+  // Truncate caption for preview
+  const MAX_CHARS = 280;
+  const [expanded, setExpanded] = useState(false);
+  const captionTrunc =
+    pub.caption.length > MAX_CHARS && !expanded
+      ? pub.caption.slice(0, MAX_CHARS) + "…"
+      : pub.caption;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background border border-border rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground truncate max-w-[220px]">
+              {pub.title}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onEdit}
+              className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent/30 text-muted-foreground hover:text-foreground transition-colors"
+              title="Editar"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent/30 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Network switcher */}
+        {pub.networks.length > 1 && (
+          <div className="flex gap-1 px-4 pt-3">
+            {pub.networks.map((n) => (
+              <button
+                key={n}
+                onClick={() => setActiveNetwork(n)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  activeNetwork === n
+                    ? networkBadgeClass(n) + " border-transparent"
+                    : "border-border text-muted-foreground hover:border-border/60"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Card preview */}
+        <div className="p-4">
+          {activeNetwork === "Instagram" && (
+            <InstagramPreview
+              pub={pub}
+              imageUrl={imageUrl}
+              captionTrunc={captionTrunc}
+              expanded={expanded}
+              setExpanded={setExpanded}
+              dateLabel={dateLabel}
+            />
+          )}
+          {activeNetwork === "Facebook" && (
+            <FacebookPreview
+              pub={pub}
+              imageUrl={imageUrl}
+              captionTrunc={captionTrunc}
+              expanded={expanded}
+              setExpanded={setExpanded}
+              dateLabel={dateLabel}
+            />
+          )}
+          {activeNetwork === "LinkedIn" && (
+            <LinkedInPreview
+              pub={pub}
+              imageUrl={imageUrl}
+              captionTrunc={captionTrunc}
+              expanded={expanded}
+              setExpanded={setExpanded}
+              dateLabel={dateLabel}
+            />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 pb-3 text-center text-[10px] text-muted-foreground/50">
+          Vista previa ilustrativa · El contenido real puede variar
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Avatar placeholder ──────────────────────────────────────────────────────
+function AvatarPlaceholder({ size = 9, letter = "M" }: { size?: number; letter?: string }) {
+  const s = `h-${size} w-${size}`;
+  return (
+    <div className={`${s} rounded-full bg-gradient-to-br from-primary/80 to-primary/40 flex items-center justify-center text-primary-foreground font-bold text-xs shrink-0`}>
+      {letter}
+    </div>
+  );
+}
+
+// ── Instagram card ──────────────────────────────────────────────────────────
+interface CardProps {
+  pub: ImportedPublication;
+  imageUrl: string | null;
+  captionTrunc: string;
+  expanded: boolean;
+  setExpanded: (v: boolean) => void;
+  dateLabel: string;
+}
+
+function InstagramPreview({ pub, imageUrl, captionTrunc, expanded, setExpanded, dateLabel }: CardProps) {
+  const isStory = pub.instagramType === "story";
+  const isCarousel = pub.instagramType === "carousel";
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-border bg-[#111] text-white text-sm shadow-md">
+      {/* Top bar */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px] shrink-0">
+          <div className="h-full w-full rounded-full bg-[#111] flex items-center justify-center text-xs font-bold text-white">M</div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold leading-tight">tu_marca</p>
+          {isStory && <p className="text-[10px] text-gray-400">Historia</p>}
+          {isCarousel && <p className="text-[10px] text-gray-400">Carrusel</p>}
+        </div>
+        <MoreHorizontal className="h-4 w-4 text-gray-400 shrink-0" />
+      </div>
+
+      {/* Image */}
+      {imageUrl ? (
+        <div className={`w-full bg-black ${isStory ? "aspect-[9/16]" : "aspect-square"} overflow-hidden relative`}>
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+          {isCarousel && (
+            <div className="absolute top-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-[10px]">1 / 3</div>
+          )}
+        </div>
+      ) : (
+        <div className={`w-full bg-[#222] ${isStory ? "aspect-[9/16]" : "aspect-square"} flex items-center justify-center text-gray-600 text-xs`}>
+          Sin imagen
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-3 px-3 py-2">
+        <Heart className="h-5 w-5" />
+        <MessageCircle className="h-5 w-5" />
+        <Send className="h-5 w-5" />
+        <Bookmark className="h-5 w-5 ml-auto" />
+      </div>
+
+      {/* Caption */}
+      <div className="px-3 pb-3 space-y-1">
+        <p className="text-xs font-semibold">tu_marca{" "}
+          <span className="font-normal text-gray-300 whitespace-pre-wrap break-words">{captionTrunc}</span>
+          {pub.caption.length > 280 && !expanded && (
+            <button className="text-gray-500 ml-1" onClick={() => setExpanded(true)}>más</button>
+          )}
+        </p>
+        <p className="text-[10px] text-gray-500 uppercase tracking-wide">{dateLabel}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Facebook card ───────────────────────────────────────────────────────────
+function FacebookPreview({ pub, imageUrl, captionTrunc, expanded, setExpanded, dateLabel }: CardProps) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-border bg-[#18191a] text-white text-sm shadow-md">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+        <AvatarPlaceholder size={9} letter="M" />
+        <div className="flex-1">
+          <p className="text-xs font-semibold leading-tight">Tu Marca</p>
+          <p className="text-[10px] text-gray-400">{dateLabel} · 🌐</p>
+        </div>
+        <MoreHorizontal className="h-4 w-4 text-gray-400 shrink-0" />
+      </div>
+
+      {/* Caption */}
+      <div className="px-3 pb-2">
+        <p className="text-xs text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{captionTrunc}
+          {pub.caption.length > 280 && !expanded && (
+            <button className="text-blue-400 ml-1" onClick={() => setExpanded(true)}>Ver más</button>
+          )}
+        </p>
+      </div>
+
+      {/* Image */}
+      {imageUrl ? (
+        <div className="w-full aspect-video bg-black overflow-hidden">
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        </div>
+      ) : (
+        <div className="w-full aspect-video bg-[#3a3b3c] flex items-center justify-center text-gray-500 text-xs">
+          Sin imagen
+        </div>
+      )}
+
+      {/* Reaction bar */}
+      <div className="flex items-center justify-between px-3 py-2 text-gray-400 text-[11px] border-t border-[#3a3b3c]">
+        <span className="flex items-center gap-1">👍 ❤️ <span className="text-gray-500">Me gusta</span></span>
+        <span className="flex items-center gap-3">
+          <span>Comentar</span>
+          <span>Compartir</span>
+        </span>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center px-3 pb-2 gap-1 border-t border-[#3a3b3c]">
+        {[
+          { icon: <ThumbsUp className="h-4 w-4" />, label: "Me gusta" },
+          { icon: <MessageCircle className="h-4 w-4" />, label: "Comentar" },
+          { icon: <Share2 className="h-4 w-4" />, label: "Compartir" },
+        ].map(({ icon, label }) => (
+          <button key={label} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-gray-400 hover:bg-[#3a3b3c] rounded-md transition-colors">
+            {icon} {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── LinkedIn card ───────────────────────────────────────────────────────────
+function LinkedInPreview({ pub, imageUrl, captionTrunc, expanded, setExpanded, dateLabel }: CardProps) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-border bg-[#1b1f23] text-white text-sm shadow-md">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 pt-4 pb-2">
+        <AvatarPlaceholder size={10} letter="M" />
+        <div className="flex-1">
+          <p className="text-xs font-semibold leading-tight">Tu Marca</p>
+          <p className="text-[10px] text-gray-400">Empresa · {dateLabel}</p>
+          <p className="text-[10px] text-gray-500">🌐</p>
+        </div>
+        <MoreHorizontal className="h-4 w-4 text-gray-400 shrink-0" />
+      </div>
+
+      {/* Caption */}
+      <div className="px-4 pb-3">
+        <p className="text-xs text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{captionTrunc}
+          {pub.caption.length > 280 && !expanded && (
+            <button className="text-[#70b5f9] ml-1" onClick={() => setExpanded(true)}>...más</button>
+          )}
+        </p>
+      </div>
+
+      {/* Image */}
+      {imageUrl ? (
+        <div className="w-full aspect-video bg-black overflow-hidden">
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        </div>
+      ) : (
+        <div className="w-full aspect-video bg-[#2c3036] flex items-center justify-center text-gray-500 text-xs">
+          Sin imagen
+        </div>
+      )}
+
+      {/* Reactions */}
+      <div className="px-4 py-2 flex items-center justify-between text-[10px] text-gray-500 border-t border-[#2c3036]">
+        <span>👍 💡 ❤️</span>
+        <span>0 comentarios</span>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center px-2 pb-3 gap-0.5 border-t border-[#2c3036]">
+        {[
+          { icon: <ThumbsUp className="h-4 w-4" />, label: "Recomendar" },
+          { icon: <MessageCircle className="h-4 w-4" />, label: "Comentar" },
+          { icon: <Share2 className="h-4 w-4" />, label: "Compartir" },
+          { icon: <Send className="h-4 w-4" />, label: "Enviar" },
+        ].map(({ icon, label }) => (
+          <button key={label} className="flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] text-gray-400 hover:bg-[#2c3036] rounded-md transition-colors">
+            {icon} {label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -267,6 +596,7 @@ function PreviewStep({ publications, onChange, onBack, onNext }: PreviewStepProp
   const [networkFilter, setNetworkFilter] = useState<NetworkFilter>("all");
   const [validationFilter, setValidationFilter] = useState<ValidationFilter>("all");
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
 
   const filtered = publications.filter((pub) => {
     if (search && !pub.title.toLowerCase().includes(search.toLowerCase())) return false;
@@ -377,16 +707,20 @@ function PreviewStep({ publications, onChange, onBack, onNext }: PreviewStepProp
           </thead>
           <tbody className="divide-y divide-border/50">
             {filtered.map((pub, idx) => (
-              <tr key={pub.raw.id} className="hover:bg-accent/20 transition-colors">
-                <td className="px-3 py-2">
+              <tr
+                key={pub.raw.id}
+                className="hover:bg-accent/20 transition-colors cursor-pointer"
+                onClick={() => setPreviewIdx(idx)}
+              >
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={pub.selected}
                     onChange={() => toggleOne(idx)}
-                    className="h-3.5 w-3.5 accent-primary"
+                    className="h-3.5 w-3.5 accent-primary cursor-pointer"
                   />
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap">
+                <td className="px-3 py-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="datetime-local"
                     value={pub.scheduledAt}
@@ -407,13 +741,12 @@ function PreviewStep({ publications, onChange, onBack, onNext }: PreviewStepProp
                   </div>
                 </td>
                 <td className="px-3 py-2 max-w-[180px]">
-                  <button
-                    className="text-left truncate text-xs hover:text-primary hover:underline w-full"
+                  <span
+                    className="text-left truncate text-xs block"
                     title={pub.title}
-                    onClick={() => setEditingIdx(idx)}
                   >
                     {pub.title || <span className="italic text-muted-foreground">Sin título</span>}
-                  </button>
+                  </span>
                 </td>
                 <td className="px-3 py-2">
                   <span className="text-[10px] text-muted-foreground">{pub.raw.tipo_publicacion ?? "—"}</span>
@@ -446,6 +779,18 @@ function PreviewStep({ publications, onChange, onBack, onNext }: PreviewStepProp
           Continuar <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
+
+      {/* Preview modal */}
+      {previewIdx !== null && (
+        <PostPreviewModal
+          pub={filtered[previewIdx]}
+          onEdit={() => {
+            setEditingIdx(previewIdx);
+            setPreviewIdx(null);
+          }}
+          onClose={() => setPreviewIdx(null)}
+        />
+      )}
 
       {/* Edit modal */}
       {editingIdx !== null && (

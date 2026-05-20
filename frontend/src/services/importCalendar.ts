@@ -9,8 +9,6 @@ import {
   ImportNetwork,
 } from "@/types/import";
 
-const VALID_NETWORKS: ImportNetwork[] = ["Facebook", "Instagram", "LinkedIn"];
-
 // ---------------------------------------------------------------------------
 // parsePublicationsJson
 // ---------------------------------------------------------------------------
