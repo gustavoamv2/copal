@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { config } from "./config";
 import { errorHandler, notFound } from "./middleware/error.middleware";
 import { startWorker } from "./workers/publication.worker";
+import "./workers/social-publish.job";
 
 import authRoutes from "./routes/auth.routes";
 import oauthRoutes from "./routes/oauth.routes";
