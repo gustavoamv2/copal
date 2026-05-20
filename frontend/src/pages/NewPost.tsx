@@ -132,15 +132,15 @@ export function NewPost() {
           {selectedMedia.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Sin imágenes adjuntas</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {selectedMedia.map((m) => (
-                <div key={m.id} className="relative group h-20 w-20 rounded-md overflow-hidden border border-border">
-                  <img src={m.thumbnail_url ?? m.storage_url} alt={m.filename} className="h-full w-full object-cover" />
+                <div key={m.id} className="relative group h-40 w-40 rounded-lg overflow-hidden border border-border">
+                  <img src={m.storage_url} alt={m.filename} className="h-full w-full object-cover" />
                   <button
-                    className="absolute inset-0 bg-black/60 hidden group-hover:flex items-center justify-center"
+                    className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => setSelectedMedia((prev) => prev.filter((x) => x.id !== m.id))}
                   >
-                    <X className="h-4 w-4 text-white" />
+                    <X className="h-3.5 w-3.5 text-white" />
                   </button>
                 </div>
               ))}
