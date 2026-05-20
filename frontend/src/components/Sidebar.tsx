@@ -6,7 +6,6 @@ import {
   Image,
   Clock,
   History,
-  Link2,
   Settings,
   LogOut,
   Zap,
@@ -22,7 +21,6 @@ const NAV = [
   { to: "/media", icon: Image, label: "Biblioteca" },
   { to: "/scheduled", icon: Clock, label: "Programadas" },
   { to: "/history", icon: History, label: "Historial" },
-  { to: "/accounts", icon: Link2, label: "Cuentas" },
   { to: "/settings", icon: Settings, label: "Configuración" },
 ];
 

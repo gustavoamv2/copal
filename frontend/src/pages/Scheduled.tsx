@@ -45,8 +45,10 @@ const POST_STATUS_FILTERS = [
 
 function PostsTab() {
   const qc = useQueryClient();
-  const [status, setStatus] = useState("");
+  const [status,       setStatus]       = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [checked,      setChecked]      = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["posts", { status, limit: 100 }],
@@ -54,6 +56,8 @@ function PostsTab() {
       postsApi.list({ status: status || undefined, limit: 100 }).then((r) => r.data),
     refetchInterval: 30_000,
   });
+
+  const posts = data?.data ?? [];
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => postsApi.delete(id),
@@ -64,23 +68,73 @@ function PostsTab() {
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
+  const toggleCheck = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (checked.size === posts.length) {
+      setChecked(new Set());
+    } else {
+      setChecked(new Set(posts.map((p) => p.id)));
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (checked.size === 0) return;
+    setBulkDeleting(true);
+    let ok = 0;
+    for (const id of checked) {
+      try { await postsApi.delete(id); ok++; } catch { /* continue */ }
+    }
+    setChecked(new Set());
+    qc.invalidateQueries({ queryKey: ["posts"] });
+    toast({ title: `${ok} publicación${ok !== 1 ? "es" : ""} eliminada${ok !== 1 ? "s" : ""}` });
+    setBulkDeleting(false);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
+      {/* Filters + bulk actions */}
+      <div className="flex flex-wrap gap-2 items-center">
         {POST_STATUS_FILTERS.map((f) => (
           <Button
             key={f.value}
             variant={status === f.value ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatus(f.value)}
+            onClick={() => { setStatus(f.value); setChecked(new Set()); }}
           >
             {f.label}
           </Button>
         ))}
+
+        {checked.size > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="ml-auto gap-1.5"
+            onClick={bulkDelete}
+            disabled={bulkDeleting}
+          >
+            {bulkDeleting ? "Eliminando..." : `Eliminar ${checked.size} seleccionada${checked.size !== 1 ? "s" : ""}`}
+          </Button>
+        )}
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center gap-3 pb-3">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary cursor-pointer"
+            checked={posts.length > 0 && checked.size === posts.length}
+            onChange={toggleAll}
+            title="Seleccionar todas"
+          />
           <CardTitle className="text-base">{data?.total ?? 0} publicaciones</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -90,43 +144,48 @@ function PostsTab() {
                 <div key={i} className="h-14 animate-pulse bg-muted/50 mb-2 rounded-md" />
               ))}
             </div>
-          ) : !data?.data.length ? (
+          ) : !posts.length ? (
             <p className="text-center py-12 text-muted-foreground text-sm">
               No hay publicaciones con este filtro
             </p>
           ) : (
             <div className="divide-y divide-border">
-              {data.data.map((post) => {
+              {posts.map((post) => {
                 const platforms = post.variants.map((v) => v.platform);
-                // Infer platform from title when no variants
                 const inferredPlatform = platforms.length === 0
                   ? post.title.toLowerCase().includes("instagram") ? "Instagram"
                     : post.title.toLowerCase().includes("facebook") ? "Facebook"
                     : post.title.toLowerCase().includes("linkedin") ? "LinkedIn"
                     : null
                   : null;
-                // Infer type from title
                 const inferredType = post.title.toLowerCase().includes("story") || post.title.toLowerCase().includes("reel") ? "Story/Reel"
                   : post.title.toLowerCase().includes("carrusel") || post.title.toLowerCase().includes("carousel") ? "Carrusel"
                   : platforms.length === 0 ? "Post" : null;
+                const isChecked = checked.has(post.id);
 
                 return (
                   <div
                     key={post.id}
-                    className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors cursor-pointer"
+                    className={`flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors cursor-pointer ${isChecked ? "bg-accent/20" : ""}`}
                     onClick={() => setSelectedPost(post)}
                   >
-                    {/* Platform dots */}
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary cursor-pointer shrink-0"
+                      checked={isChecked}
+                      onClick={(e) => toggleCheck(post.id, e)}
+                      onChange={() => {}}
+                    />
+
+                    {/* Platform dot */}
                     <div className="flex gap-1 shrink-0">
-                      {platforms.length > 0 ? (
-                        platforms.map((p, i) => <PlatformDot key={i} platform={p} />)
-                      ) : (
-                        <PlatformDot platform={inferredPlatform?.toLowerCase()} />
-                      )}
+                      {platforms.length > 0
+                        ? platforms.map((p, i) => <PlatformDot key={i} platform={p} />)
+                        : <PlatformDot platform={inferredPlatform?.toLowerCase()} />}
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      {/* Red Social · Tipo · Título */}
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5 flex-wrap">
                         {platforms.length > 0 ? (
                           <span className="capitalize font-medium text-foreground/70">
@@ -135,9 +194,7 @@ function PostsTab() {
                         ) : inferredPlatform ? (
                           <span className="font-medium text-foreground/70">{inferredPlatform}</span>
                         ) : null}
-                        {(platforms.length > 0 || inferredPlatform) && inferredType && (
-                          <span className="text-muted-foreground/50">·</span>
-                        )}
+                        {(platforms.length > 0 || inferredPlatform) && inferredType && <span className="text-muted-foreground/50">·</span>}
                         {inferredType && <span>{inferredType}</span>}
                       </div>
                       <p className="text-sm font-medium truncate">{post.title}</p>

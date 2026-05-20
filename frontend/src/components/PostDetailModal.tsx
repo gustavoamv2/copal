@@ -4,6 +4,7 @@ import {
   X, Pencil, Check, Heart, MessageCircle, Send,
   Bookmark, ThumbsUp, Share2, MoreHorizontal, ChevronLeft,
 } from "lucide-react";
+import { BrandAvatar } from "@/components/BrandAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,28 +47,9 @@ function PostImage({ src, isStory, isCarousel }: { src?: string; isStory?: boole
 // ---------------------------------------------------------------------------
 // Avatar
 // ---------------------------------------------------------------------------
+// Avatar delegated to BrandAvatar component
 function Avatar({ size = 36, ring = false }: { size?: number; ring?: boolean }) {
-  const style = { width: size, height: size };
-  if (ring) {
-    return (
-      <div
-        style={style}
-        className="rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px] shrink-0"
-      >
-        <div className="h-full w-full rounded-full bg-[#111] flex items-center justify-center text-xs font-bold text-white">
-          M
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div
-      style={style}
-      className="rounded-full bg-gradient-to-br from-primary/80 to-primary/40 flex items-center justify-center text-primary-foreground font-bold text-xs shrink-0"
-    >
-      M
-    </div>
-  );
+  return <BrandAvatar size={size} ring={ring} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +86,7 @@ function InstagramCard({ caption, imageUrl, instagramType, dateLabel }: {
       <div className="flex items-center gap-2.5 px-3 py-2.5">
         <Avatar size={32} ring />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold leading-tight">tu_marca</p>
+          <p className="text-xs font-semibold leading-tight">actualizateconia</p>
           {isStory    && <p className="text-[10px] text-gray-400">Historia</p>}
           {isCarousel && <p className="text-[10px] text-gray-400">Carrusel</p>}
         </div>
@@ -125,7 +107,7 @@ function InstagramCard({ caption, imageUrl, instagramType, dateLabel }: {
       {/* Caption */}
       <div className="px-3 pb-4 space-y-1.5">
         <p className="text-xs">
-          <span className="font-semibold mr-1">tu_marca</span>
+          <span className="font-semibold mr-1">actualizateconia</span>
           <Caption text={caption} className="text-gray-200" />
         </p>
         <p className="text-[10px] text-gray-500 uppercase tracking-wide">{dateLabel}</p>
@@ -146,7 +128,7 @@ function FacebookCard({ caption, imageUrl, dateLabel }: {
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
         <Avatar size={40} />
         <div className="flex-1">
-          <p className="text-xs font-semibold leading-tight">Tu Marca</p>
+          <p className="text-xs font-semibold leading-tight">Actualizate con IA</p>
           <p className="text-[10px] text-gray-400">{dateLabel} · 🌐</p>
         </div>
         <MoreHorizontal className="h-4 w-4 text-gray-400" />
@@ -196,7 +178,7 @@ function LinkedInCard({ caption, imageUrl, dateLabel }: {
       <div className="flex items-center gap-2.5 px-4 pt-4 pb-2">
         <Avatar size={44} />
         <div className="flex-1">
-          <p className="text-xs font-semibold leading-tight">Tu Marca</p>
+          <p className="text-xs font-semibold leading-tight">Actualizate con IA</p>
           <p className="text-[10px] text-gray-400">Empresa · {dateLabel}</p>
           <p className="text-[10px] text-gray-500">🌐 Para todos</p>
         </div>
@@ -247,7 +229,7 @@ function GenericCard({ caption, imageUrl, dateLabel }: {
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
         <Avatar size={36} />
         <div className="flex-1">
-          <p className="text-xs font-semibold">Tu Marca</p>
+          <p className="text-xs font-semibold">Actualizate con IA</p>
           <p className="text-[10px] text-muted-foreground">{dateLabel}</p>
         </div>
       </div>

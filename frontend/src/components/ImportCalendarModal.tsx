@@ -68,15 +68,21 @@ function ValidationBadge({ pub }: { pub: ImportedPublication }) {
   const { valid, errors, warnings } = pub.validation;
   if (!valid) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-red-400">
+      <span
+        className="inline-flex items-center gap-1 text-xs text-red-400 cursor-help"
+        title={errors.join("\n")}
+      >
         <X className="h-3 w-3" /> {errors.length} error{errors.length !== 1 ? "es" : ""}
       </span>
     );
   }
   if (warnings.length > 0) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-yellow-400">
-        <AlertTriangle className="h-3 w-3" /> {warnings.length}
+      <span
+        className="inline-flex items-center gap-1 text-xs text-yellow-400 cursor-help"
+        title={warnings.join("\n")}
+      >
+        <AlertTriangle className="h-3 w-3" /> {warnings.length} aviso{warnings.length !== 1 ? "s" : ""}
       </span>
     );
   }
@@ -825,6 +831,7 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
   const withoutImage = selected.length - withImage;
   const withWarnings = selected.filter((p) => p.validation.warnings.length > 0).length;
   const withErrors = selected.filter((p) => !p.validation.valid).length;
+  const withPastDate = selected.filter((p) => p.scheduledAt && new Date(p.scheduledAt) <= new Date()).length;
 
   const [mode, setMode] = useState<ImportMode>("draft");
   const [importing, setImporting] = useState(false);
@@ -889,6 +896,16 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
         <div className="flex items-start gap-2 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-sm text-red-400">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{withErrors} publicación{withErrors !== 1 ? "es" : ""} con errores serán importadas igualmente. Pueden fallar.</span>
+        </div>
+      )}
+
+      {withPastDate > 0 && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-400">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            <strong>{withPastDate}</strong> publicación{withPastDate !== 1 ? "es tienen" : " tiene"} fecha en el pasado.
+            {" "}Al importar como programadas, se guardarán como <strong>borrador</strong> en lugar de programarse en redes.
+          </span>
         </div>
       )}
 

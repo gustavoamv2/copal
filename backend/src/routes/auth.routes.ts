@@ -20,6 +20,48 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(["admin", "editor"]).optional().default("editor"),
+});
+
+router.post("/register", async (req, res, next) => {
+  try {
+    const { email, password, role } = registerSchema.parse(req.body);
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) throw createError("Email already exists", 409);
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { email, password_hash, role },
+    });
+
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const accessToken  = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+
+    await prisma.refreshToken.create({
+      data: {
+        user_id: user.id,
+        token_hash: hashToken(refreshToken),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    res
+      .cookie(REFRESH_COOKIE, refreshToken, REFRESH_COOKIE_OPTIONS)
+      .status(201)
+      .json({
+        access_token: accessToken,
+        user: { id: user.id, email: user.email, role: user.role, timezone: user.timezone },
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);

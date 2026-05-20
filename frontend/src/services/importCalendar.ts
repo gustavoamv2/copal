@@ -190,27 +190,32 @@ export async function importPublication(
       imageStorageUrl = res.data.storage_url;
     }
 
-    const postRes = await postsApi.create({
+    // If the scheduled date is in the past, fall back to draft
+    // regardless of the chosen mode to avoid a 400 from the backend.
+    const scheduledDate = pub.scheduledAt ? new Date(pub.scheduledAt) : null;
+    const isFuture = scheduledDate && scheduledDate > new Date();
+    const effectiveMode: ImportMode = mode === "scheduled" && !isFuture ? "draft" : mode;
+
+    await postsApi.create({
       title: pub.title,
       base_caption: pub.caption,
-      status: mode === "draft" ? "draft" : "scheduled",
-      scheduled_at: mode === "scheduled" ? new Date(pub.scheduledAt).toISOString() : null,
+      status: effectiveMode === "draft" ? "draft" : "scheduled",
+      scheduled_at: effectiveMode === "scheduled" ? scheduledDate!.toISOString() : null,
       variants: [],
       media_ids: imageMediaId ? [imageMediaId] : [],
     });
 
-    if (mode === "scheduled") {
+    if (effectiveMode === "scheduled") {
       const { platforms, instagramType } = mapPlatforms(pub.networks, pub.instagramType);
       await socialApi.schedule({
         content: pub.caption,
         platforms,
         instagramType: instagramType as "feed" | "story" | "carousel",
         mediaUrls: imageStorageUrl ? [imageStorageUrl] : [],
-        scheduledAt: new Date(pub.scheduledAt).toISOString(),
+        scheduledAt: scheduledDate!.toISOString(),
       });
     }
 
-    void postRes; // used above
     return { success: true };
   } catch (err: unknown) {
     const message =
