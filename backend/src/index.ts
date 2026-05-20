@@ -16,6 +16,7 @@ import publicationsRoutes from "./routes/publications.routes";
 import accountsRoutes from "./routes/accounts.routes";
 import settingsRoutes from "./routes/settings.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
+import socialRoutes from "./routes/social.routes";
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use("/api/publications", publicationsRoutes);
 app.use("/api/accounts", accountsRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/social", socialRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

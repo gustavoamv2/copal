@@ -76,7 +76,7 @@ export function Accounts() {
                   onClick={() => {
                     const endpoint = key === "linkedin" ? "linkedin" : "meta";
                     const token = getAccessToken();
-                    window.location.href = `/api/oauth/${endpoint}/connect?token=${token}`;
+                    window.location.href = `${import.meta.env.VITE_API_URL}/api/oauth/${endpoint}/connect?token=${token}`;
                   }}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
