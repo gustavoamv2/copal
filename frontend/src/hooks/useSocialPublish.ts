@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { socialApi, SocialPlatform } from "@/api/social";
+import { socialApi, SocialPlatform, InstagramPostType } from "@/api/social";
 
 interface PublishOptions {
   content: string;
   platforms: SocialPlatform[];
   mediaUrls?: string[];
   scheduledAt?: string;
+  instagramType?: InstagramPostType;
 }
 
 interface PublishResult {
