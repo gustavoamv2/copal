@@ -1,15 +1,50 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   CalendarClock, CheckCircle2, FileText, AlertCircle,
-  PenSquare, ArrowRight, Instagram, Facebook, Linkedin,
+  PenSquare, Instagram, Facebook, Linkedin,
 } from "lucide-react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import { EventClickArg } from "@fullcalendar/core";
 import { dashboardApi } from "@/api/dashboard";
 import { postsApi } from "@/api/posts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/utils";
+import { PostDetailModal } from "@/components/PostDetailModal";
 import { useAuth } from "@/hooks/useAuth";
+import type { Post, Platform } from "@/types";
+
+const PLATFORM_COLORS: Record<Platform, string> = {
+  instagram: "#E1306C",
+  facebook:  "#1877F2",
+  linkedin:  "#0A66C2",
+};
+
+function eventLabel(post: Post): string {
+  if (post.variants.length > 0) {
+    const networks = Array.from(
+      new Set(post.variants.map((v) => {
+        switch (v.platform) {
+          case "instagram": return "Instagram";
+          case "facebook":  return "Facebook";
+          case "linkedin":  return "LinkedIn";
+        }
+      }))
+    );
+    return networks.join(" / ");
+  }
+  const t = post.title;
+  const network = t.includes("LinkedIn") ? "LinkedIn"
+    : t.includes("Facebook") ? "Facebook"
+    : t.includes("Instagram") ? "Instagram"
+    : "—";
+  const type = t.includes("Story") || t.includes("Reel") ? "Story/Reel"
+    : t.toLowerCase().includes("carrusel") || t.toLowerCase().includes("carousel") ? "Carrusel"
+    : "Post";
+  return `${network} · ${type}`;
+}
 
 function MetricCard({
   icon: Icon, label, value, color,
@@ -65,6 +100,7 @@ function BrandLogo({ size = 64 }: { size?: number }) {
 
 export function Dashboard() {
   const { user } = useAuth();
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-metrics"],
@@ -72,22 +108,43 @@ export function Dashboard() {
     refetchInterval: 30_000,
   });
 
-  const { data: postsData } = useQuery({
-    queryKey: ["posts", { status: "scheduled", limit: 20 }],
-    queryFn: () => postsApi.list({ status: "scheduled", limit: 20 }).then((r) => r.data),
-    refetchInterval: 30_000,
-    select: (d) => {
-      const now = new Date();
-      return {
-        ...d,
-        // Only show posts scheduled from now onwards, soonest first
-        data: [...d.data]
-          .filter((p) => p.scheduled_at && new Date(p.scheduled_at) >= now)
-          .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
-          .slice(0, 5),
-      };
-    },
+  const { data: calendarData } = useQuery({
+    queryKey: ["posts", { limit: 200 }],
+    queryFn: () => postsApi.list({ limit: 200 }).then((r) => r.data),
+    refetchInterval: 60_000,
   });
+
+  const posts = calendarData?.data ?? [];
+
+  const events = posts
+    .filter((p) => p.scheduled_at)
+    .flatMap((post) => {
+      const label = eventLabel(post);
+      if (post.variants.length > 0) {
+        const seen = new Set<string>();
+        return post.variants
+          .filter((v) => { const dup = seen.has(v.platform); seen.add(v.platform); return !dup; })
+          .map((v) => ({
+            id: `${post.id}_${v.platform}`,
+            title: label,
+            start: post.scheduled_at!,
+            backgroundColor: PLATFORM_COLORS[v.platform as Platform] ?? "#6366f1",
+            borderColor: "transparent",
+            extendedProps: { postId: post.id },
+          }));
+      }
+      const t = post.title.toLowerCase();
+      const bg = t.includes("instagram") ? "#E1306C"
+        : t.includes("facebook") ? "#1877F2"
+        : t.includes("linkedin") ? "#0A66C2"
+        : "#6366f1";
+      return [{ id: post.id, title: label, start: post.scheduled_at!, backgroundColor: bg, borderColor: "transparent", extendedProps: { postId: post.id } }];
+    });
+
+  const handleEventClick = (info: EventClickArg) => {
+    const postId = info.event.extendedProps.postId as string;
+    setSelectedPost(posts.find((p) => p.id === postId) ?? null);
+  };
 
   return (
     <div className="space-y-8">
@@ -133,51 +190,31 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* ── Upcoming from posts table (includes imported) ───── */}
+      {/* ── Calendar ────────────────────────────────────────── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Próximas publicaciones</CardTitle>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/scheduled">Ver todas <ArrowRight className="h-3.5 w-3.5 ml-1" /></Link>
-          </Button>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Calendario de publicaciones</CardTitle>
         </CardHeader>
         <CardContent>
-          {!postsData?.data.length ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No hay publicaciones programadas</p>
-          ) : (
-            <div className="space-y-2">
-              {postsData.data.map((post) => {
-                const t = post.title.toLowerCase();
-                const network = t.includes("instagram") ? "Instagram"
-                  : t.includes("facebook") ? "Facebook"
-                  : t.includes("linkedin") ? "LinkedIn"
-                  : post.variants[0]?.platform ?? "—";
-                const NetworkIcon = network === "Instagram" ? Instagram
-                  : network === "Facebook" ? Facebook
-                  : Linkedin;
-                const iconColor = network === "Instagram" ? "text-pink-500"
-                  : network === "Facebook" ? "text-blue-600"
-                  : "text-blue-800";
-
-                return (
-                  <div
-                    key={post.id}
-                    className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-3 hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <NetworkIcon className={`h-4 w-4 shrink-0 ${iconColor}`} />
-                      <span className="text-sm font-medium truncate">{post.title}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground shrink-0 ml-4">
-                      {post.scheduled_at ? formatDateTime(post.scheduled_at) : "—"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <div className="[&_.fc]:text-foreground [&_.fc-toolbar-title]:font-semibold [&_.fc-toolbar-title]:text-base [&_.fc-button]:bg-accent [&_.fc-button]:border-border [&_.fc-button]:text-foreground [&_.fc-button:hover]:bg-accent/80 [&_.fc-button-primary]:!bg-primary [&_.fc-button-primary]:!border-primary [&_.fc-day-today]:!bg-primary/5 [&_.fc-daygrid-day]:!border-border [&_.fc-scrollgrid]:!border-border [&_.fc-col-header-cell]:border-border [&_.fc-scrollgrid-section>td]:border-border [&_.fc-event]:cursor-pointer">
+            <FullCalendar
+              plugins={[dayGridPlugin]}
+              initialView="dayGridMonth"
+              events={events}
+              locale="es"
+              height="auto"
+              headerToolbar={{ left: "prev,next today", center: "title", right: "" }}
+              buttonText={{ today: "Hoy" }}
+              eventDisplay="block"
+              eventClick={handleEventClick}
+            />
+          </div>
         </CardContent>
       </Card>
+
+      {selectedPost && (
+        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      )}
 
       {/* ── User info footer ────────────────────────────────── */}
       {user && (

@@ -23,7 +23,8 @@ export function NewPost() {
   const [scheduledAt, setScheduledAt] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() + 5);
-    return d.toISOString().slice(0, 16);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
