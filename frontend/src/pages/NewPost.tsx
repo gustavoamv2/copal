@@ -208,22 +208,26 @@ export function NewPost() {
           {/* Selector de plataformas */}
           <div className="flex flex-wrap gap-2">
             {([
-              { id: "facebook", label: "Facebook" },
-              { id: "instagram", label: "Instagram" },
-              { id: "linkedin", label: "LinkedIn" },
-              { id: "whatsapp", label: "WhatsApp" },
-            ] as { id: SocialPlatform; label: string }[]).map(({ id, label }) => (
+              { id: "facebook", label: "Facebook", disabled: false },
+              { id: "instagram", label: "Instagram", disabled: false },
+              { id: "linkedin", label: "LinkedIn", disabled: false },
+              { id: "whatsapp", label: "WhatsApp", disabled: true },
+            ] as { id: SocialPlatform; label: string; disabled: boolean }[]).map(({ id, label, disabled }) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => toggleAyrPlatform(id)}
+                disabled={disabled}
+                onClick={() => !disabled && toggleAyrPlatform(id)}
+                title={disabled ? "Próximamente" : undefined}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  ayrPlatforms.includes(id)
+                  disabled
+                    ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
+                    : ayrPlatforms.includes(id)
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-background text-muted-foreground border-border hover:border-primary/50"
                 }`}
               >
-                {label}
+                {label}{disabled ? " · Próximamente" : ""}
               </button>
             ))}
           </div>
