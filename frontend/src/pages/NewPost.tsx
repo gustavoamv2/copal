@@ -101,6 +101,17 @@ export function NewPost() {
     if (!baseCaption || ayrPlatforms.length === 0) return;
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
     const scheduledIso = scheduledAt ? new Date(scheduledAt).toISOString() : undefined;
+
+    if (scheduledIso && mediaUrls.length === 0) {
+      toast({ title: "Debes adjuntar al menos una imagen para programar una publicación", variant: "destructive" });
+      return;
+    }
+
+    if (ayrPlatforms.includes("instagram") && mediaUrls.length === 0) {
+      toast({ title: "Instagram requiere al menos una imagen", variant: "destructive" });
+      return;
+    }
+
     const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
@@ -216,38 +227,6 @@ export function NewPost() {
             </CardContent>
           </Card>
 
-          {/* Cuentas destino */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Cuentas destino</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!accounts?.length ? (
-                <p className="text-sm text-muted-foreground">No hay cuentas conectadas</p>
-              ) : (
-                <div className="space-y-2">
-                  {accounts.filter((a) => a.is_active).map((acc) => {
-                    const selected = selectedAccounts.includes(acc.id);
-                    return (
-                      <button
-                        key={acc.id}
-                        onClick={() => toggleAccount(acc)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-sm transition-colors ${
-                          selected
-                            ? "border-primary/50 bg-primary/5"
-                            : "border-border hover:border-border/80 hover:bg-accent/50"
-                        }`}
-                      >
-                        <PlatformBadge platform={acc.platform} />
-                        <span className="flex-1 text-left truncate">{acc.account_name}</span>
-                        {selected && <div className="h-2 w-2 rounded-full bg-primary shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         {/* Vista previa */}
