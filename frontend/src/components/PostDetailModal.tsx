@@ -404,9 +404,14 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
             {mode === "preview" ? "Vista previa ilustrativa" : "Los cambios se guardan en la base de datos"}
           </p>
           {mode === "preview" ? (
-            <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5 shrink-0">
-              <Pencil className="h-3.5 w-3.5" /> Editar
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="ghost" onClick={onClose}>
+                Cerrar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5">
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </Button>
+            </div>
           ) : (
             <div className="flex gap-2 shrink-0">
               <Button size="sm" variant="outline" onClick={() => setMode("preview")}>Cancelar</Button>

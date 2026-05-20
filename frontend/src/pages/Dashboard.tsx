@@ -73,9 +73,17 @@ export function Dashboard() {
   });
 
   const { data: postsData } = useQuery({
-    queryKey: ["posts", { status: "scheduled", limit: 5 }],
-    queryFn: () => postsApi.list({ status: "scheduled", limit: 5 }).then((r) => r.data),
+    queryKey: ["posts", { status: "scheduled", limit: 20 }],
+    queryFn: () => postsApi.list({ status: "scheduled", limit: 20 }).then((r) => r.data),
     refetchInterval: 30_000,
+    select: (d) => ({
+      ...d,
+      // Sort by scheduled_at ascending (soonest first), take top 5
+      data: [...d.data]
+        .filter((p) => p.scheduled_at)
+        .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
+        .slice(0, 5),
+    }),
   });
 
   return (
