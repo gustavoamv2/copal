@@ -5,7 +5,7 @@ import { Router, Request, Response } from 'express';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { zernioService, SocialPlatform } from '../services/zernio.service';
-import { SocialPublishJobData } from '../workers/social-publish.job';
+import type { SocialPublishJobData } from '../workers/social-publish.job';
 import { config } from '../config';
 
 const router = Router();
