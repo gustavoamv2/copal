@@ -64,7 +64,7 @@ class NativeSocialService {
         }
 
         if (platform === 'instagram') {
-          const result = await publishToInstagram(account, content, mediaAssets);
+          const result = await publishToInstagram(account, content, mediaAssets, options.instagramType ?? 'feed');
           platformResults[platform] = { status: 'success', postUrl: result.platform_post_id };
         } else if (platform === 'facebook') {
           const result = await publishToFacebook(account, content, mediaAssets);

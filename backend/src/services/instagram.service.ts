@@ -23,17 +23,70 @@ async function waitForContainer(pageId: string, containerId: string, token: stri
 export async function publishToInstagram(
   account: SocialAccount,
   caption: string,
-  mediaAssets: MediaAsset[]
+  mediaAssets: MediaAsset[],
+  instagramType: "feed" | "story" | "carousel" = "feed"
 ): Promise<PublishResult> {
   const token = decrypt(account.access_token_enc);
   const pageId = account.account_id;
 
-  // Instagram requires at least one image/video via Graph API
   if (!mediaAssets.length) throw new Error("Instagram requires at least one media asset");
 
   let containerId: string;
 
-  if (mediaAssets.length === 1) {
+  if (instagramType === "story") {
+    // Stories: single media, media_type STORIES, sin caption (API no lo soporta)
+    const asset = mediaAssets[0];
+    const isVideo = asset.file_type.startsWith("video/");
+    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        [isVideo ? "video_url" : "image_url"]: asset.storage_url,
+        media_type: "STORIES",
+        access_token: token,
+      }),
+    });
+    const data = (await res.json()) as { id?: string; error?: { message: string } };
+    if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram story container");
+    containerId = data.id;
+
+  } else if (instagramType === "carousel" || mediaAssets.length > 1) {
+    // Carrusel: crear item por item, esperar videos, luego crear contenedor padre
+    const childIds: string[] = [];
+    for (const asset of mediaAssets) {
+      const isVideo = asset.file_type.startsWith("video/");
+      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          [isVideo ? "video_url" : "image_url"]: asset.storage_url,
+          is_carousel_item: true,
+          access_token: token,
+        }),
+      });
+      const data = (await res.json()) as { id?: string; error?: { message: string } };
+      if (!data.id) throw new Error(data.error?.message ?? "Failed to create carousel item");
+      // Los videos dentro de carrusel también necesitan esperar FINISHED
+      if (isVideo) await waitForContainer(pageId, data.id, token);
+      childIds.push(data.id);
+    }
+
+    const carouselRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        media_type: "CAROUSEL",
+        children: childIds.join(","),
+        caption,
+        access_token: token,
+      }),
+    });
+    const carouselData = (await carouselRes.json()) as { id?: string; error?: { message: string } };
+    if (!carouselData.id) throw new Error(carouselData.error?.message ?? "Failed to create carousel");
+    containerId = carouselData.id;
+
+  } else {
+    // Feed: imagen única o reel (video)
     const asset = mediaAssets[0];
     const isVideo = asset.file_type.startsWith("video/");
     const body: Record<string, string> = {
@@ -51,37 +104,6 @@ export async function publishToInstagram(
     const data = (await res.json()) as { id?: string; error?: { message: string } };
     if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram media container");
     containerId = data.id;
-  } else {
-    // Carousel
-    const childIds: string[] = [];
-    for (const asset of mediaAssets) {
-      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_url: asset.storage_url,
-          is_carousel_item: true,
-          access_token: token,
-        }),
-      });
-      const data = (await res.json()) as { id?: string; error?: { message: string } };
-      if (!data.id) throw new Error(data.error?.message ?? "Failed to create carousel item");
-      childIds.push(data.id);
-    }
-
-    const carouselRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        media_type: "CAROUSEL",
-        children: childIds.join(","),
-        caption,
-        access_token: token,
-      }),
-    });
-    const carouselData = (await carouselRes.json()) as { id?: string; error?: { message: string } };
-    if (!carouselData.id) throw new Error(carouselData.error?.message ?? "Failed to create carousel");
-    containerId = carouselData.id;
   }
 
   // Wait for container to be FINISHED before publishing
