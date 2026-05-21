@@ -56,7 +56,8 @@ export function validatePublication(raw: RawPublication): ValidationResult {
     errors.push("Debe tener al menos una red social válida (Facebook, Instagram, LinkedIn)");
   }
 
-  if (!raw.imagen?.trim()) {
+  const hasImages = (raw.imagenes && raw.imagenes.length > 0) || raw.imagen?.trim();
+  if (!hasImages) {
     warnings.push("No se especificó imagen");
   }
 
@@ -137,6 +138,9 @@ export function normalizePublication(raw: RawPublication): ImportedPublication {
     raw.tipo_publicacion
   );
 
+  // Collect all image paths: prefer the explicit array, fall back to the single field
+  const imagePaths: string[] = raw.imagenes?.filter(Boolean) ?? (raw.imagen?.trim() ? [raw.imagen.trim()] : []);
+
   return {
     raw,
     title: raw.titulo_interno ?? "",
@@ -144,8 +148,10 @@ export function normalizePublication(raw: RawPublication): ImportedPublication {
     scheduledAt,
     networks,
     instagramType,
-    imagePath: raw.imagen ?? "",
+    imagePath: imagePaths[0] ?? "",
+    imagePaths,
     imageFile: undefined,
+    imageFiles: [],
     imageUrl: undefined,
     validation,
     importStatus: "pending",
@@ -163,13 +169,18 @@ export function resolveImageFiles(
   files: File[]
 ): ImportedPublication[] {
   return publications.map((pub) => {
-    if (!pub.imagePath) return pub;
+    if (pub.imagePaths.length === 0) return pub;
 
-    const basename = pub.imagePath.split(/[\\/]/).pop()?.toLowerCase() ?? "";
-    const match = files.find((f) => f.name.toLowerCase() === basename);
-    if (!match) return pub;
+    const resolvedFiles: File[] = pub.imagePaths
+      .map((p) => {
+        const basename = p.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+        return files.find((f) => f.name.toLowerCase() === basename) ?? null;
+      })
+      .filter((f): f is File => f !== null);
 
-    return { ...pub, imageFile: match };
+    if (resolvedFiles.length === 0) return pub;
+
+    return { ...pub, imageFiles: resolvedFiles, imageFile: resolvedFiles[0] };
   });
 }
 
@@ -181,13 +192,14 @@ export async function importPublication(
   mode: ImportMode
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    let imageMediaId: string | undefined;
-    let imageStorageUrl: string | undefined;
+    const mediaIds: string[] = [];
+    const mediaStorageUrls: string[] = [];
 
-    if (pub.imageFile) {
-      const res = await mediaApi.upload(pub.imageFile);
-      imageMediaId = res.data.id;
-      imageStorageUrl = res.data.storage_url;
+    // Upload all image files (carousel support)
+    for (const file of pub.imageFiles) {
+      const res = await mediaApi.upload(file);
+      mediaIds.push(res.data.id);
+      mediaStorageUrls.push(res.data.storage_url);
     }
 
     // If the scheduled date is in the past, fall back to draft
@@ -202,7 +214,7 @@ export async function importPublication(
       status: effectiveMode === "draft" ? "draft" : "scheduled",
       scheduled_at: scheduledDate ? scheduledDate.toISOString() : null,
       variants: [],
-      media_ids: imageMediaId ? [imageMediaId] : [],
+      media_ids: mediaIds,
     });
 
     if (effectiveMode === "scheduled") {
@@ -211,7 +223,7 @@ export async function importPublication(
         content: pub.caption,
         platforms,
         instagramType: instagramType as "feed" | "story" | "carousel",
-        mediaUrls: imageStorageUrl ? [imageStorageUrl] : [],
+        mediaUrls: mediaStorageUrls,
         scheduledAt: scheduledDate!.toISOString(),
       });
     }

@@ -14,6 +14,7 @@ export interface RawPublication {
   red_social?: string;
   tipo_publicacion?: string;
   imagen?: string;
+  imagenes?: string[];  // múltiples imágenes para carruseles
   estado?: string;
   origen?: string;
 }
@@ -34,9 +35,11 @@ export interface ImportedPublication {
   scheduledAt: string; // ISO datetime local string for input[datetime-local]
   networks: ImportNetwork[];
   instagramType: "feed" | "story" | "carousel";
-  imagePath: string;
-  imageFile?: File;
-  imageUrl?: string;
+  imagePath: string;       // primary image path (first of imagePaths, for backward compat)
+  imagePaths: string[];    // all image paths (carousel support)
+  imageFile?: File;        // primary resolved file (for preview)
+  imageFiles: File[];      // all resolved files
+  imageUrl?: string;       // primary URL after upload
   // state
   validation: ValidationResult;
   importStatus: ImportStatus;

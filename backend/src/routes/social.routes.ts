@@ -90,7 +90,7 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
 // Programa un post para publicarse en el futuro
 // ─────────────────────────────────────────────
 router.post('/schedule', async (req: AuthRequest, res: Response) => {
-  const { content, platforms, mediaUrls, scheduledAt } = req.body;
+  const { content, platforms, mediaUrls, scheduledAt, instagramType, accounts } = req.body;
   const userId = req.user!.sub;
 
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -121,6 +121,8 @@ router.post('/schedule', async (req: AuthRequest, res: Response) => {
         platforms,
         mediaUrls: mediaUrls || [],
         scheduledAt,
+        instagramType: instagramType || 'feed',
+        accounts: accounts || undefined,
         userId,
       },
       {

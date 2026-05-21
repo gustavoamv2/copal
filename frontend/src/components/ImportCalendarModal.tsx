@@ -60,8 +60,16 @@ function networkBadgeClass(n: ImportNetwork): string {
 }
 
 function ImageDot({ pub }: { pub: ImportedPublication }) {
-  if (pub.imageFile) return <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" title="Imagen encontrada" />;
-  if (pub.imagePath) return <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Ruta sin archivo" />;
+  const count = pub.imagePaths.length;
+  if (pub.imageFiles.length > 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5" title={`${pub.imageFiles.length} imagen(es) encontrada(s)`}>
+        <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
+        {count > 1 && <span className="text-[10px] text-green-500 font-medium">{count}</span>}
+      </span>
+    );
+  }
+  if (count > 0) return <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Ruta(s) sin archivo" />;
   return <span className="inline-block w-2.5 h-2.5 rounded-full bg-muted-foreground/30" title="Sin imagen" />;
 }
 
