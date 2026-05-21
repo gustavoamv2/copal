@@ -456,15 +456,6 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const [publishing, setPublishing] = useState(false);
 
   const handlePublish = async () => {
-    // LinkedIn cannot be auto-published — use manual copy+open flow
-    if (isLinkedIn) {
-      try {
-        await handleLinkedInCopyOpen();
-      } catch {
-        toast({ title: "Error al copiar o abrir LinkedIn", variant: "destructive" });
-      }
-      return;
-    }
     setPublishing(true);
     try {
       const res = await postsApi.publishNow(post.id);
@@ -656,7 +647,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Eliminar
                 </Button>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 flex-wrap justify-end">
                   <Button size="sm" variant="ghost" onClick={onClose}>
                     Cerrar
                   </Button>
@@ -670,22 +661,34 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                       Publicado
                     </div>
                   ) : (
-                    <Button
-                      size="sm"
-                      className={`gap-1.5 text-white min-w-[120px] ${
-                        isLinkedIn
-                          ? "bg-[#0A66C2] hover:bg-[#004182]"
-                          : "bg-green-600 hover:bg-green-700"
-                      }`}
-                      onClick={handlePublish}
-                      disabled={publishing}
-                    >
-                      {publishing
-                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publicando…</>
-                        : isLinkedIn
-                          ? <><ExternalLink className="h-3.5 w-3.5" /> Copiar y abrir</>
+                    <>
+                      {/* LinkedIn manual copy+open — only shown for LinkedIn posts */}
+                      {isLinkedIn && (
+                        <Button
+                          size="sm"
+                          className="gap-1.5 bg-[#0A66C2] hover:bg-[#004182] text-white whitespace-nowrap"
+                          onClick={async () => {
+                            try { await handleLinkedInCopyOpen(); }
+                            catch { toast({ title: "Error al abrir LinkedIn", variant: "destructive" }); }
+                          }}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Copiar y abrir LinkedIn
+                        </Button>
+                      )}
+
+                      {/* Publish now — disabled for LinkedIn, active for everything else */}
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
+                        onClick={handlePublish}
+                        disabled={publishing || isLinkedIn}
+                        title={isLinkedIn ? "LinkedIn no admite publicación directa — usa el botón azul" : undefined}
+                      >
+                        {publishing
+                          ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publicando…</>
                           : <><Zap className="h-3.5 w-3.5" /> Publicar ahora</>}
-                    </Button>
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
