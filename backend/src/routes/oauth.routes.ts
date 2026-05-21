@@ -29,7 +29,7 @@ router.get("/meta/connect", oauthAuth, (req: AuthRequest, res) => {
   const params = new URLSearchParams({
     client_id: config.META_APP_ID,
     redirect_uri: config.META_REDIRECT_URI,
-    scope: "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,business_management",
+    scope: "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish",
     response_type: "code",
     state,
   });
