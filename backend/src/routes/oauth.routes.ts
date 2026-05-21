@@ -158,12 +158,25 @@ router.get("/linkedin/callback", async (req, res, next) => {
     };
     if (!tokenData.access_token) throw createError("Failed to get LinkedIn token", 502);
 
-    // Fetch profile
+    // Fetch profile — prefer /v2/me (native member ID) over OIDC sub
+    // because the UGC Posts API requires the native ID, not the OIDC sub
     const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const profile = (await profileRes.json()) as { sub?: string; name?: string };
     if (!profile.sub) throw createError("Failed to get LinkedIn profile", 502);
+
+    // Try to get native member ID from /v2/me (compatible with UGC Posts API)
+    let nativeMemberId = profile.sub;
+    try {
+      const meRes = await fetch("https://api.linkedin.com/v2/me", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}`, "X-Restli-Protocol-Version": "2.0.0" },
+      });
+      if (meRes.ok) {
+        const me = (await meRes.json()) as { id?: string; localizedFirstName?: string; localizedLastName?: string };
+        if (me.id) nativeMemberId = me.id;
+      }
+    } catch {}
 
     const expiresAt = tokenData.expires_in
       ? new Date(Date.now() + tokenData.expires_in * 1000)
@@ -174,7 +187,7 @@ router.get("/linkedin/callback", async (req, res, next) => {
         user_id_platform_account_id: {
           user_id: userId,
           platform: "linkedin",
-          account_id: profile.sub,
+          account_id: nativeMemberId,
         },
       },
       update: {
@@ -187,7 +200,7 @@ router.get("/linkedin/callback", async (req, res, next) => {
         user_id: userId,
         platform: "linkedin",
         account_name: profile.name ?? "LinkedIn Account",
-        account_id: profile.sub,
+        account_id: nativeMemberId,
         access_token_enc: encrypt(tokenData.access_token),
         token_expires_at: expiresAt,
       },

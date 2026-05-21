@@ -6,15 +6,28 @@ interface PublishResult {
   api_response: unknown;
 }
 
+async function getMemberUrn(token: string, storedAccountId: string): Promise<string> {
+  if (storedAccountId.startsWith("urn:li:")) return storedAccountId;
+  // Try /v2/me to get the native LinkedIn member ID (OIDC sub may differ)
+  try {
+    const res = await fetch("https://api.linkedin.com/v2/me", {
+      headers: { Authorization: `Bearer ${token}`, "X-Restli-Protocol-Version": "2.0.0" },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { id?: string };
+      if (data.id) return `urn:li:person:${data.id}`;
+    }
+  } catch {}
+  return `urn:li:person:${storedAccountId}`;
+}
+
 export async function publishToLinkedIn(
   account: SocialAccount,
   caption: string,
   mediaAssets: MediaAsset[]
 ): Promise<PublishResult> {
   const token = decrypt(account.access_token_enc);
-  const authorUrn = account.account_id.startsWith("urn:li:")
-    ? account.account_id
-    : `urn:li:person:${account.account_id}`;
+  const authorUrn = await getMemberUrn(token, account.account_id);
 
   const body: Record<string, unknown> = {
     author: authorUrn,
