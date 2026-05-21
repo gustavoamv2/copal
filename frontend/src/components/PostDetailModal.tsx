@@ -330,10 +330,12 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
 
   const handlePublish = async () => {
     const mediaUrls = imageUrls.length > 0 ? imageUrls : undefined;
+    const mediaIds = (post.post_media ?? []).map((pm) => pm.media_asset_id).filter(Boolean);
     const res = await publish({
       content: post.base_caption,
       platforms: publishPlatforms,
       mediaUrls,
+      mediaIds: mediaIds.length > 0 ? mediaIds : undefined,
       instagramType: instagramType as "feed" | "story" | "carousel",
     });
     if (res.success) {

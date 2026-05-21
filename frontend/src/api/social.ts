@@ -31,6 +31,8 @@ export const socialApi = {
       platforms: payload.platforms,
       mediaUrls: payload.mediaUrls ?? [],
       scheduledAt: payload.scheduledAt,
+      instagramType: payload.instagramType ?? "feed",
+      ...(payload.mediaIds?.length ? { mediaIds: payload.mediaIds } : {}),
       ...(payload.accounts ? { accounts: payload.accounts } : {}),
     }),
 
