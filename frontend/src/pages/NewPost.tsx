@@ -93,12 +93,12 @@ export function NewPost() {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
-  const handlePublishNow = async () => {
+  const handlePublish = async (immediate: boolean) => {
     if (!baseCaption || ayrPlatforms.length === 0) return;
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
-    const scheduledIso = scheduledAt ? new Date(scheduledAt).toISOString() : undefined;
+    const scheduledIso = immediate ? undefined : (scheduledAt ? new Date(scheduledAt).toISOString() : undefined);
 
-    if (scheduledIso && mediaUrls.length === 0) {
+    if (!immediate && mediaUrls.length === 0) {
       toast({ title: "Debes adjuntar al menos una imagen para programar una publicación", variant: "destructive" });
       return;
     }
@@ -346,17 +346,23 @@ export function NewPost() {
               </div>
             </div>
           )}
-          <Button
-            className="w-full"
-            disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
-            onClick={handlePublishNow}
-          >
-            {publishing
-              ? "Procesando..."
-              : scheduledAt
-              ? "Programar publicación"
-              : "Publicar ahora"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
+              onClick={() => handlePublish(true)}
+            >
+              {publishing ? "Procesando..." : "Publicar ahora"}
+            </Button>
+            <Button
+              className="flex-1"
+              disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
+              onClick={() => handlePublish(false)}
+            >
+              {publishing ? "Procesando..." : "Programar publicación"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
