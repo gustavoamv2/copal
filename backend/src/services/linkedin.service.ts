@@ -7,6 +7,12 @@ interface PublishResult {
 }
 
 async function getMemberUrn(token: string, storedAccountId: string): Promise<string> {
+  if (storedAccountId.startsWith("urn:li:organization:")) {
+    throw new Error(
+      "Publicar en páginas de empresa de LinkedIn requiere el permiso w_organization_social, " +
+      "pendiente de aprobación por LinkedIn. Usa tu cuenta personal de LinkedIn."
+    );
+  }
   if (storedAccountId.startsWith("urn:li:")) return storedAccountId;
   // Try /v2/me to get the native LinkedIn member ID (OIDC sub may differ)
   try {

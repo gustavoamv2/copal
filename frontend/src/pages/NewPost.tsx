@@ -292,12 +292,15 @@ export function NewPost() {
                         <SelectValue placeholder="Cuenta automática" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__auto__">Automática</SelectItem>
-                        {accs.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.account_name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="__auto__">Automática (personal)</SelectItem>
+                        {accs.map((a) => {
+                          const isOrg = a.account_id.startsWith("urn:li:organization:");
+                          return (
+                            <SelectItem key={a.id} value={a.id} disabled={isOrg}>
+                              {a.account_name}{isOrg ? " (página — no disponible)" : ""}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}

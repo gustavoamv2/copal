@@ -51,13 +51,27 @@ class NativeSocialService {
       let account: SocialAccount | null = null;
       try {
         const specificId = options.accounts?.[platform];
-        account = specificId
-          ? await prisma.socialAccount.findFirst({
-              where: { id: specificId, user_id: userId, is_active: true },
-            })
-          : await prisma.socialAccount.findFirst({
+        if (specificId) {
+          account = await prisma.socialAccount.findFirst({
+            where: { id: specificId, user_id: userId, is_active: true },
+          });
+        } else if (platform === 'linkedin') {
+          // Prefer personal accounts — org accounts need w_organization_social (not approved)
+          account =
+            await prisma.socialAccount.findFirst({
+              where: {
+                user_id: userId, platform, is_active: true,
+                NOT: { account_id: { startsWith: 'urn:li:organization:' } },
+              },
+            }) ??
+            await prisma.socialAccount.findFirst({
               where: { user_id: userId, platform, is_active: true },
             });
+        } else {
+          account = await prisma.socialAccount.findFirst({
+            where: { user_id: userId, platform, is_active: true },
+          });
+        }
 
         if (!account) {
           platformResults[platform] = { status: 'error', error: `No hay cuenta de ${platform} conectada` };
