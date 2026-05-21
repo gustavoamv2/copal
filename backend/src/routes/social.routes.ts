@@ -98,7 +98,7 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
 // Programa un post para publicarse en el futuro
 // ─────────────────────────────────────────────
 router.post('/schedule', async (req: AuthRequest, res: Response) => {
-  const { content, platforms, mediaUrls, scheduledAt, instagramType, accounts } = req.body;
+  const { content, platforms, mediaUrls, mediaIds, scheduledAt, instagramType, accounts } = req.body;
   const userId = req.user!.sub;
 
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -121,10 +121,30 @@ router.post('/schedule', async (req: AuthRequest, res: Response) => {
   try {
     const delay = scheduleDate.getTime() - Date.now();
 
+    // Create a Post record so the scheduled publication is visible in History
+    const dbPost = await prisma.post.create({
+      data: {
+        user_id: userId,
+        title: content.trim().slice(0, 80) || 'Sin título',
+        base_caption: content.trim(),
+        status: 'scheduled',
+        scheduled_at: scheduleDate,
+        ...(Array.isArray(mediaIds) && mediaIds.length > 0 ? {
+          post_media: {
+            create: (mediaIds as string[]).map((id, idx) => ({
+              media_asset_id: id,
+              order_index: idx,
+            })),
+          },
+        } : {}),
+      },
+    });
+
     const job = await socialQueue.add(
       'publish-scheduled',
       {
         postId: `post_${Date.now()}`,
+        dbPostId: dbPost.id,
         content: content.trim(),
         platforms,
         mediaUrls: mediaUrls || [],
