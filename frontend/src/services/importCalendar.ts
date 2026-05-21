@@ -47,6 +47,9 @@ export function validatePublication(raw: RawPublication): ValidationResult {
   const allNetworks = [
     ...(raw.redes ?? []),
     ...(raw.red_social ? [raw.red_social] : []),
+    ...(raw.canal_a_publicar ? [raw.canal_a_publicar] : []),
+    // canal implícito en tipo_publicacion (ej. "LinkedIn Post", "Instagram Reel")
+    ...(raw.tipo_publicacion ? [raw.tipo_publicacion] : []),
   ];
   const validFound = allNetworks.some((n) => {
     const lower = n.toLowerCase();
@@ -70,31 +73,46 @@ export function validatePublication(raw: RawPublication): ValidationResult {
 export function mapNetworks(
   redes: string[],
   red_social?: string,
-  tipo_publicacion?: string
-): { networks: ImportNetwork[]; instagramType: "feed" | "story" | "carousel" } {
-  const allSources = [...redes, ...(red_social ? [red_social] : [])];
+  tipo_publicacion?: string,
+  canal_a_publicar?: string,
+): { networks: ImportNetwork[]; instagramType: "feed" | "story" | "carousel" | "reel" } {
+  // Unificar todas las fuentes posibles de red social
+  const allSources = [
+    ...redes,
+    ...(red_social       ? [red_social]       : []),
+    ...(canal_a_publicar ? [canal_a_publicar] : []),
+    ...(tipo_publicacion ? [tipo_publicacion] : []),
+  ];
+
   const networks = Array.from(
     new Set(
       allSources
         .map((n) => {
-          if (n === "LinkedIn") return "LinkedIn";
-          if (n === "Facebook") return "Facebook";
-          if (n === "Instagram" || n === "Instagram Post") return "Instagram";
-          if (n === "Instagram Story/Reel") return "Instagram";
+          const lower = n.toLowerCase();
+          if (lower.includes("linkedin"))  return "LinkedIn";
+          if (lower.includes("facebook"))  return "Facebook";
+          if (lower.includes("instagram")) return "Instagram";
           return null;
         })
         .filter((n): n is ImportNetwork => n !== null)
     )
   );
 
-  let instagramType: "feed" | "story" | "carousel" = "feed";
+  // Determinar tipo de publicación de Instagram según tipo_publicacion
+  let instagramType: "feed" | "story" | "carousel" | "reel" = "feed";
+  const tp = tipo_publicacion?.toLowerCase() ?? "";
 
-  const isStory = allSources.some((n) => n === "Instagram Story/Reel");
-  if (isStory) instagramType = "story";
-
-  if (tipo_publicacion?.toLowerCase().includes("carrusel")) {
+  if (tp.includes("carrusel") || tp.includes("carousel")) {
     instagramType = "carousel";
+  } else if (tp.includes("story") || tp.includes("historia")) {
+    instagramType = "story";
+  } else if (tp.includes("reel")) {
+    instagramType = "reel";
   }
+
+  // Fallback para formato legado "Instagram Story/Reel"
+  const hasLegacyStoryReel = allSources.some((n) => n === "Instagram Story/Reel");
+  if (hasLegacyStoryReel && instagramType === "feed") instagramType = "story";
 
   return { networks, instagramType };
 }
@@ -135,7 +153,8 @@ export function normalizePublication(raw: RawPublication): ImportedPublication {
   const { networks, instagramType } = mapNetworks(
     raw.redes ?? [],
     raw.red_social,
-    raw.tipo_publicacion
+    raw.tipo_publicacion,
+    raw.canal_a_publicar,
   );
 
   // Collect all image paths: prefer the explicit array, fall back to the single field
@@ -208,8 +227,15 @@ export async function importPublication(
     const isFuture = scheduledDate && scheduledDate > new Date();
     const effectiveMode: ImportMode = mode === "scheduled" && !isFuture ? "draft" : mode;
 
+    // Prefixar el título con el tipo de publicación para que el calendario
+    // pueda mostrar "Red Social · Tipo" aunque el post no tenga variants.
+    const tipoLabel =
+      pub.raw.tipo_publicacion ??
+      (pub.networks.length > 0 ? pub.networks.join(" / ") : null);
+    const titleForCalendar = tipoLabel ? `${tipoLabel} · ${pub.title}` : pub.title;
+
     await postsApi.create({
-      title: pub.title,
+      title: titleForCalendar,
       base_caption: pub.caption,
       status: effectiveMode === "draft" ? "draft" : "scheduled",
       scheduled_at: scheduledDate ? scheduledDate.toISOString() : null,
@@ -219,13 +245,18 @@ export async function importPublication(
 
     if (effectiveMode === "scheduled") {
       const { platforms, instagramType } = mapPlatforms(pub.networks, pub.instagramType);
-      await socialApi.schedule({
-        content: pub.caption,
-        platforms,
-        instagramType: instagramType as "feed" | "story" | "carousel",
-        mediaUrls: mediaStorageUrls,
-        scheduledAt: scheduledDate!.toISOString(),
-      });
+      // LinkedIn company pages no se pueden auto-publicar vía API sin aprobación especial.
+      // Los posts de LinkedIn se guardan en BD con fecha y aparecen en "Pendiente manual".
+      const autoPlatforms = platforms.filter((p) => p !== "linkedin");
+      if (autoPlatforms.length > 0) {
+        await socialApi.schedule({
+          content: pub.caption,
+          platforms: autoPlatforms,
+          instagramType: instagramType as "feed" | "story" | "carousel" | "reel",
+          mediaUrls: mediaStorageUrls,
+          scheduledAt: scheduledDate!.toISOString(),
+        });
+      }
     }
 
     return { success: true };

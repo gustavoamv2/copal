@@ -32,7 +32,6 @@ import {
 } from "@/services/importCalendar";
 import {
   ImportedPublication,
-  ImportMode,
   ImportNetwork,
   ImportReport,
   ImportResult,
@@ -842,7 +841,6 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
   const withErrors = selected.filter((p) => !p.validation.valid).length;
   const withPastDate = selected.filter((p) => p.scheduledAt && new Date(p.scheduledAt) <= new Date()).length;
 
-  const [mode, setMode] = useState<ImportMode>("draft");
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const cancelRef = useRef(false);
@@ -859,7 +857,10 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
       setProgress(i + 1);
 
       const pub = selected[i];
-      const { success, error } = await importPublication(pub, mode);
+      // Siempre importar como "scheduled":
+      // - Facebook e Instagram se programan automáticamente
+      // - LinkedIn queda en "Pendiente manual"
+      const { success, error } = await importPublication(pub, "scheduled");
       results.push({
         id: pub.raw.id,
         title: pub.title,
@@ -913,33 +914,29 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
             <strong>{withPastDate}</strong> publicación{withPastDate !== 1 ? "es tienen" : " tiene"} fecha en el pasado.
-            {" "}Al importar como programadas, se guardarán como <strong>borrador</strong> en lugar de programarse en redes.
+            {" "}Se guardarán como <strong>borrador</strong> en lugar de programarse en redes.
           </span>
         </div>
       )}
 
-      {/* Mode selector */}
-      <div className="grid grid-cols-2 gap-3">
-        {(["draft", "scheduled"] as ImportMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`p-4 rounded-lg border text-left transition-colors ${
-              mode === m
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-background text-muted-foreground hover:border-border/80"
-            }`}
-          >
-            <p className="font-medium text-sm">
-              {m === "draft" ? "Importar como borradores" : "Importar como programadas"}
-            </p>
-            <p className="text-xs mt-1 opacity-70">
-              {m === "draft"
-                ? "Guarda como draft, sin programar en redes"
-                : "Crea y programa en las redes sociales seleccionadas"}
-            </p>
-          </button>
-        ))}
+      {/* Comportamiento automático por plataforma */}
+      <div className="rounded-lg border border-border bg-accent/20 divide-y divide-border overflow-hidden text-sm">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="text-base">📸</span>
+          <div>
+            <p className="font-medium text-foreground">Instagram · Facebook</p>
+            <p className="text-xs text-muted-foreground">Se programan automáticamente según la fecha del calendario</p>
+          </div>
+          <span className="ml-auto text-xs font-medium text-green-500 shrink-0">Auto</span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="text-base">💼</span>
+          <div>
+            <p className="font-medium text-foreground">LinkedIn</p>
+            <p className="text-xs text-muted-foreground">Se guarda con fecha pero requiere publicación manual desde la pestaña "Pendiente manual"</p>
+          </div>
+          <span className="ml-auto text-xs font-medium text-amber-400 shrink-0">Manual</span>
+        </div>
       </div>
 
       {/* Progress */}

@@ -3,6 +3,10 @@ import { prisma } from "../prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import { createError } from "../middleware/error.middleware";
 import { schedulePublication } from "../services/scheduler.service";
+import { deleteFromCloudinary } from "../services/cloudinary.service";
+import { publishToInstagram } from "../services/instagram.service";
+import { publishToFacebook } from "../services/facebook.service";
+import { publishToLinkedIn } from "../services/linkedin.service";
 import { z } from "zod";
 
 const router = Router();
@@ -155,12 +159,129 @@ router.put("/:id", async (req: AuthRequest, res, next) => {
   }
 });
 
+// ── Publish a post immediately via direct platform API (no Ayrshare) ──────────
+router.post("/:id/publish", async (req: AuthRequest, res, next) => {
+  try {
+    const userId = req.user!.sub;
+    const post = await prisma.post.findFirst({
+      where: { id: req.params.id, user_id: userId },
+      include: {
+        variants: { include: { social_account: true } },
+        post_media: { include: { media_asset: true }, orderBy: { order_index: "asc" } },
+      },
+    });
+    if (!post) throw createError("Post not found", 404);
+    if (post.status === "published") {
+      return res.json({ ok: true, alreadyPublished: true });
+    }
+
+    const mediaAssets = post.post_media.map((pm) => pm.media_asset);
+    const titleLower  = post.title.toLowerCase();
+
+    // Derive instagram type from title prefix set at import time
+    const igType: "feed" | "story" | "carousel" | "reel" =
+      mediaAssets.length > 1                                                  ? "carousel"
+      : titleLower.includes("reel")                                           ? "reel"
+      : titleLower.includes("story") || titleLower.includes("historia")       ? "story"
+      : "feed";
+
+    const errors: string[] = [];
+    let successCount = 0;
+
+    if (post.variants.length > 0) {
+      // Posts created manually — one variant per platform/account
+      for (const variant of post.variants as typeof post.variants & { social_account: NonNullable<(typeof post.variants)[0]["social_account"]> }[]) {
+        if ((variant as any).status === "published") { successCount++; continue; }
+        const account = (variant as any).social_account;
+        try {
+          let result: { platform_post_id: string };
+          if (variant.platform === "instagram") {
+            result = await publishToInstagram(account, variant.caption, mediaAssets, igType);
+          } else if (variant.platform === "facebook") {
+            result = await publishToFacebook(account, variant.caption, mediaAssets);
+          } else {
+            result = await publishToLinkedIn(account, variant.caption, mediaAssets);
+          }
+          await prisma.postPlatformVariant.update({
+            where: { id: variant.id },
+            data: { status: "published", platform_post_id: result.platform_post_id, published_at: new Date() },
+          });
+          successCount++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Error desconocido";
+          errors.push(`${variant.platform}: ${msg}`);
+          await prisma.postPlatformVariant.update({
+            where: { id: variant.id },
+            data: { status: "failed", error_message: msg },
+          }).catch(() => {});
+        }
+      }
+    } else {
+      // Imported posts — derive platforms from title, use active account
+      const platforms: ("instagram" | "facebook" | "linkedin")[] = [];
+      if (titleLower.includes("instagram")) platforms.push("instagram");
+      if (titleLower.includes("facebook"))  platforms.push("facebook");
+      if (titleLower.includes("linkedin"))  platforms.push("linkedin");
+      if (platforms.length === 0) platforms.push("instagram");
+
+      for (const platform of platforms) {
+        const account = await prisma.socialAccount.findFirst({
+          where: {
+            user_id: userId, platform, is_active: true,
+            ...(platform === "linkedin" ? { account_id: { startsWith: "urn:li:organization:" } } : {}),
+          },
+        });
+        if (!account) { errors.push(`${platform}: sin cuenta activa`); continue; }
+        try {
+          if (platform === "instagram") {
+            await publishToInstagram(account, post.base_caption, mediaAssets, igType);
+          } else if (platform === "facebook") {
+            await publishToFacebook(account, post.base_caption, mediaAssets);
+          } else {
+            await publishToLinkedIn(account, post.base_caption, mediaAssets);
+          }
+          successCount++;
+        } catch (err) {
+          errors.push(`${platform}: ${err instanceof Error ? err.message : "Error"}`);
+        }
+      }
+    }
+
+    const newStatus = successCount > 0 ? "published" : "failed";
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { status: newStatus, ...(newStatus === "published" ? { published_at: new Date() } : {}) },
+    });
+
+    if (successCount === 0) throw createError(errors.join(" | "), 422);
+
+    res.json({ ok: true, ...(errors.length ? { warnings: errors } : {}) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete("/:id", async (req: AuthRequest, res, next) => {
   try {
     const existing = await prisma.post.findFirst({
       where: { id: req.params.id, user_id: req.user!.sub },
+      include: {
+        post_media: { include: { media_asset: true } },
+      },
     });
     if (!existing) throw createError("Post not found", 404);
+
+    // Delete associated media assets from Cloudinary and DB
+    for (const pm of existing.post_media) {
+      const asset = pm.media_asset;
+      try {
+        await deleteFromCloudinary(asset.storage_url);
+      } catch {
+        // If Cloudinary deletion fails, continue — we still want to remove the DB record
+      }
+      await prisma.mediaAsset.delete({ where: { id: asset.id } });
+    }
+
     await prisma.post.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
   } catch (err) {

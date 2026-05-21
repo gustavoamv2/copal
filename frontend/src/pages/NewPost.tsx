@@ -60,8 +60,64 @@ export function NewPost() {
   });
   const allAccounts = accountsData ?? [];
 
-  const accountsForPlatform = (p: SocialPlatform) =>
-    allAccounts.filter((a) => a.platform === p && a.is_active);
+  const accountsForPlatform = (p: SocialPlatform) => {
+    const accs = allAccounts.filter((a) => a.platform === p && a.is_active);
+    // LinkedIn: solo páginas de empresa (urn:li:organization:)
+    if (p === "linkedin") return accs.filter((a) => a.account_id.startsWith("urn:li:organization:"));
+    return accs;
+  };
+
+  // Cuenta de empresa LinkedIn activa (siempre es org por el filtro anterior)
+  const linkedInActiveAccount = (() => {
+    if (!ayrPlatforms.includes("linkedin")) return null;
+    const accs = accountsForPlatform("linkedin");
+    const selectedId = selectedAccounts["linkedin"];
+    if (selectedId) return accs.find((a) => a.id === selectedId) ?? accs[0] ?? null;
+    return accs[0] ?? null;
+  })();
+  const linkedInOrgId = linkedInActiveAccount?.account_id.replace("urn:li:organization:", "");
+
+  const downloadImages = async (assets: Array<{ storage_url: string; filename: string }>) => {
+    for (const asset of assets) {
+      try {
+        const res = await fetch(asset.storage_url);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = asset.filename || "imagen-linkedin.jpg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      } catch {
+        // CORS fallback: abre en nueva pestaña para guardar manualmente
+        window.open(asset.storage_url, "_blank");
+      }
+    }
+  };
+
+  const copyAndOpenLinkedIn = async () => {
+    try {
+      await navigator.clipboard.writeText(baseCaption);
+    } catch {
+      // fallback si clipboard no está disponible
+    }
+
+    if (selectedMedia.length > 0) {
+      await downloadImages(selectedMedia.map((m) => ({ storage_url: m.storage_url, filename: m.filename })));
+    }
+
+    const url = linkedInOrgId
+      ? `https://www.linkedin.com/company/${linkedInOrgId}/admin/page-posts/new/`
+      : "https://www.linkedin.com/feed/";
+    window.open(url, "_blank");
+
+    const imgMsg = selectedMedia.length > 0
+      ? ` · ${selectedMedia.length} imagen${selectedMedia.length > 1 ? "es descargadas" : " descargada"}`
+      : "";
+    toast({ title: `Caption copiado${imgMsg} ✓ — pega el texto y sube la imagen en LinkedIn` });
+  };
 
   const toggleAyrPlatform = (p: SocialPlatform) => {
     setAyrPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
@@ -97,6 +153,12 @@ export function NewPost() {
 
   const handlePublish = async (immediate: boolean) => {
     if (!baseCaption || ayrPlatforms.length === 0) return;
+    // LinkedIn siempre se publica manualmente — excluir del auto-publish
+    const autoPlatforms = ayrPlatforms.filter((p) => p !== "linkedin");
+    if (autoPlatforms.length === 0) {
+      toast({ title: "Usa el botón de LinkedIn para copiar y publicar manualmente", variant: "destructive" });
+      return;
+    }
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
     const scheduledIso = immediate ? undefined : (scheduledAt ? new Date(scheduledAt).toISOString() : undefined);
 
@@ -105,18 +167,18 @@ export function NewPost() {
       return;
     }
 
-    if (ayrPlatforms.includes("instagram") && mediaUrls.length === 0) {
+    if (autoPlatforms.includes("instagram") && mediaUrls.length === 0) {
       toast({ title: "Instagram requiere al menos una imagen", variant: "destructive" });
       return;
     }
 
     const accounts = Object.fromEntries(
-      Object.entries(selectedAccounts).filter(([p]) => ayrPlatforms.includes(p as SocialPlatform))
+      Object.entries(selectedAccounts).filter(([p]) => (autoPlatforms as string[]).includes(p))
     ) as Partial<Record<SocialPlatform, string>>;
 
     const mediaIds = selectedMedia.map((m) => m.id);
 
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, facebookType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
+    const res = await publish({ content: baseCaption, platforms: autoPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, facebookType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
@@ -291,18 +353,15 @@ export function NewPost() {
                       }
                     >
                       <SelectTrigger className="h-7 text-xs w-44">
-                        <SelectValue placeholder="Cuenta automática" />
+                        <SelectValue placeholder="Cuenta principal" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__auto__">Automática (personal)</SelectItem>
-                        {accs.map((a) => {
-                          const isOrg = a.account_id.startsWith("urn:li:organization:");
-                          return (
-                            <SelectItem key={a.id} value={a.id} disabled={isOrg}>
-                              {a.account_name}{isOrg ? " (página — no disponible)" : ""}
-                            </SelectItem>
-                          );
-                        })}
+                        <SelectItem value="__auto__">Principal</SelectItem>
+                        {accs.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.account_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}
@@ -334,6 +393,7 @@ export function NewPost() {
                   { id: "feed", label: "Publicación" },
                   { id: "carousel", label: "Carrusel" },
                   { id: "story", label: "Historia" },
+                  { id: "reel", label: "Reel" },
                 ] as { id: InstagramPostType; label: string }[]).map(({ id, label }) => (
                   <button
                     key={id}
@@ -377,6 +437,26 @@ export function NewPost() {
               </div>
             </div>
           )}
+          {/* Flujo manual para LinkedIn empresa */}
+          {ayrPlatforms.includes("linkedin") && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-3 space-y-2">
+              <p className="text-xs text-amber-400 font-medium">
+                ⚠️ LinkedIn no permite publicar en páginas de empresa vía API sin aprobación especial.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Usa el botón de abajo: copia el caption, descarga la imagen automáticamente y abre LinkedIn Empresa para que solo tengas que pegar el texto y subir la imagen.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                disabled={!baseCaption}
+                onClick={copyAndOpenLinkedIn}
+              >
+                📋 Copiar caption{selectedMedia.length > 0 ? ` + descargar imagen${selectedMedia.length > 1 ? "es" : ""}` : ""} y abrir LinkedIn
+              </Button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button
               variant="outline"

@@ -31,7 +31,7 @@ export async function publishToInstagram(
   account: SocialAccount,
   caption: string,
   mediaAssets: MediaAsset[],
-  instagramType: "feed" | "story" | "carousel" = "feed"
+  instagramType: "feed" | "story" | "carousel" | "reel" = "feed"
 ): Promise<PublishResult> {
   const token = decrypt(account.access_token_enc);
   const pageId = account.account_id;
@@ -92,8 +92,25 @@ export async function publishToInstagram(
     if (!carouselData.id) throw new Error(carouselData.error?.message ?? "Failed to create carousel");
     containerId = carouselData.id;
 
+  } else if (instagramType === "reel") {
+    const asset = mediaAssets[0];
+    if (!asset.file_type.startsWith("video/")) throw new Error("Instagram Reels requiere un video");
+    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        video_url: asset.storage_url,
+        media_type: "REELS",
+        caption,
+        access_token: token,
+      }),
+    });
+    const data = (await res.json()) as { id?: string; error?: { message: string } };
+    if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram Reel container");
+    containerId = data.id;
+
   } else {
-    // Feed: imagen única o reel (video)
+    // Feed: imagen única
     const asset = mediaAssets[0];
     const isVideo = asset.file_type.startsWith("video/");
     const body: Record<string, string> = {

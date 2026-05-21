@@ -21,4 +21,7 @@ export const postsApi = {
   update: (id: string, body: Partial<CreatePostBody>) => api.put<Post>(`/posts/${id}`, body),
 
   delete: (id: string) => api.delete(`/posts/${id}`),
+
+  publishNow: (id: string) =>
+    api.post<{ ok: boolean; alreadyPublished?: boolean; warnings?: string[] }>(`/posts/${id}/publish`),
 };

@@ -111,14 +111,22 @@ function WhatsAppPanel() {
   const [phone, setPhone] = useState("");
   const [connecting, setConnecting] = useState(false);
 
+  const [hasPairingCode, setHasPairingCode] = useState(false);
+
   const { data } = useQuery({
     queryKey: ["whatsapp-status"],
     queryFn: () => whatsappApi.status().then((r) => r.data),
-    refetchInterval: connecting ? 3000 : false,
+    // Poll while connecting or while waiting for user to enter pairing code
+    refetchInterval: connecting || hasPairingCode ? 2000 : false,
   });
 
-  const status = data?.status ?? "disconnected";
-  const pairingCode = data?.pairingCode;
+  const status      = data?.status ?? "disconnected";
+  const pairingCode = data?.pairingCode ?? null;
+
+  // Keep hasPairingCode in sync
+  useEffect(() => {
+    setHasPairingCode(!!pairingCode);
+  }, [pairingCode]);
 
   useEffect(() => {
     if (status === "connected" && connecting) {
@@ -172,6 +180,7 @@ function WhatsAppPanel() {
       </CardHeader>
       <CardContent className="space-y-3">
         {status === "connected" ? (
+          /* ── Connected ── */
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-green-500">
               <CheckCircle2 className="h-4 w-4" />
@@ -179,41 +188,57 @@ function WhatsAppPanel() {
             </div>
             <Button variant="outline" size="sm" onClick={handleDisconnect}>Desconectar</Button>
           </div>
-        ) : status === "qr_pending" && pairingCode ? (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Ingresa este código en WhatsApp Business:</p>
+
+        ) : pairingCode ? (
+          /* ── Pairing code received — waiting for user to enter it on phone ── */
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Abre WhatsApp en tu teléfono e ingresa este código:
+            </p>
             <div className="flex items-center gap-3">
-              <div className="font-mono text-2xl font-bold tracking-widest bg-muted px-4 py-2 rounded-md">
+              <div className="font-mono text-2xl font-bold tracking-[0.3em] bg-muted px-5 py-3 rounded-lg select-all">
                 {pairingCode}
               </div>
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Ajustes → Dispositivos vinculados → Vincular con número de teléfono
-            </p>
+            <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
+              <li>Ajustes → Dispositivos vinculados</li>
+              <li>Toca <strong>Vincular con número de teléfono</strong></li>
+              <li>Ingresa el código de arriba</li>
+            </ol>
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive w-full" onClick={handleDisconnect}>
+              Cancelar
+            </Button>
           </div>
+
+        ) : connecting ? (
+          /* ── Waiting for code to arrive from server ── */
+          <div className="flex items-center gap-2 text-sm text-amber-500 py-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Solicitando código de emparejamiento…
+          </div>
+
         ) : (
-          <div className="space-y-2">
-            {status === "qr_pending" && (
-              <div className="flex items-center gap-2 text-sm text-amber-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Generando código…
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">Número de WhatsApp Business (con código de país)</p>
+          /* ── Disconnected — show connect form ── */
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Ingresa el número de WhatsApp Business con código de país (sin +)
+            </p>
             <div className="flex gap-2">
               <Input
                 placeholder="56912345678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="flex-1"
-                disabled={connecting}
+                className="flex-1 font-mono"
                 onKeyDown={(e) => e.key === "Enter" && handleConnect()}
               />
-              <Button size="sm" onClick={handleConnect} disabled={!phone.trim() || connecting}>
-                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Conectar"}
+              <Button size="sm" onClick={handleConnect} disabled={!phone.trim()}>
+                Conectar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground/60">
+              Requiere WhatsApp o WhatsApp Business con multidispositivo activado.
+            </p>
           </div>
         )}
       </CardContent>

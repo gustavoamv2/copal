@@ -10,6 +10,7 @@ import {
   LogOut,
   Zap,
   Link2,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 const NAV = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/posts/new", icon: PenSquare, label: "Nueva publicación" },
+  { to: "/preview", icon: LayoutGrid, label: "Catálogo semanal" },
   { to: "/calendar", icon: CalendarDays, label: "Calendario" },
   { to: "/media", icon: Image, label: "Biblioteca" },
   { to: "/scheduled", icon: Clock, label: "Programadas" },

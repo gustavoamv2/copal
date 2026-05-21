@@ -7,16 +7,20 @@ export interface RawPublication {
   caption: string;
   hashtags?: string;
   caption_con_hashtags?: string;
-  fecha_publicacion: string;
-  hora_publicacion: string;
+  fecha_publicacion?: string;
+  hora_publicacion?: string;
   fecha_hora_publicacion: string;
   redes?: string[];
   red_social?: string;
+  canal_a_publicar?: string;   // formato alternativo: canal único como string
   tipo_publicacion?: string;
   imagen?: string;
   imagenes?: string[];  // múltiples imágenes para carruseles
   estado?: string;
   origen?: string;
+  dia?: number;
+  cta?: string;
+  archivo_json_texto?: string;
 }
 
 export interface ValidationResult {
@@ -34,7 +38,7 @@ export interface ImportedPublication {
   caption: string;
   scheduledAt: string; // ISO datetime local string for input[datetime-local]
   networks: ImportNetwork[];
-  instagramType: "feed" | "story" | "carousel";
+  instagramType: "feed" | "story" | "carousel" | "reel";
   imagePath: string;       // primary image path (first of imagePaths, for backward compat)
   imagePaths: string[];    // all image paths (carousel support)
   imageFile?: File;        // primary resolved file (for preview)

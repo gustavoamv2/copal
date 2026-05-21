@@ -7,3 +7,4 @@ dist/
 Thumbs.db
 backend/.wwebjs_auth/
 backend/.baileys_auth/
+.vercel

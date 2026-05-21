@@ -52,12 +52,17 @@ async function processJob(job: Job<PublishJobData>): Promise<void> {
     let result: { platform_post_id: string; api_response: unknown };
 
     if (platform === "instagram") {
-      // Infer instagram type from media: video → reel, multiple → carousel, else → feed
-      const igType = mediaAssets.length > 1
-        ? "carousel"
-        : mediaAssets[0]?.file_type.startsWith("video/")
-          ? "feed" // REELS handled inside service by detecting video
-          : "feed";
+      // Derive instagram type from post title prefix (e.g. "Instagram Reel · …")
+      // then fall back to media heuristics.
+      const titleLower = post.title.toLowerCase();
+      const igType: "feed" | "story" | "carousel" | "reel" =
+        mediaAssets.length > 1
+          ? "carousel"
+          : titleLower.includes("reel")
+            ? "reel"
+            : titleLower.includes("story") || titleLower.includes("historia")
+              ? "story"
+              : "feed";
       result = await publishToInstagram(social_account, caption, mediaAssets, igType);
     } else if (platform === "facebook") {
       result = await publishToFacebook(social_account, caption, mediaAssets);

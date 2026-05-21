@@ -8,7 +8,7 @@ import { publishToLinkedIn } from './linkedin.service';
 import { SocialAccount, MediaAsset } from '@prisma/client';
 
 export type SocialPlatform = 'facebook' | 'linkedin' | 'instagram';
-export type InstagramPostType = 'feed' | 'story' | 'carousel';
+export type InstagramPostType = 'feed' | 'story' | 'carousel' | 'reel';
 export type { FacebookPostType };
 
 export interface AyrsharePostOptions {
@@ -58,17 +58,10 @@ class NativeSocialService {
             where: { id: specificId, user_id: userId, is_active: true },
           });
         } else if (platform === 'linkedin') {
-          // Prefer personal accounts — org accounts need w_organization_social (not approved)
-          account =
-            await prisma.socialAccount.findFirst({
-              where: {
-                user_id: userId, platform, is_active: true,
-                NOT: { account_id: { startsWith: 'urn:li:organization:' } },
-              },
-            }) ??
-            await prisma.socialAccount.findFirst({
-              where: { user_id: userId, platform, is_active: true },
-            });
+          // Solo páginas de empresa — las cuentas personales no se usan
+          account = await prisma.socialAccount.findFirst({
+            where: { user_id: userId, platform, is_active: true, account_id: { startsWith: 'urn:li:organization:' } },
+          });
         } else {
           account = await prisma.socialAccount.findFirst({
             where: { user_id: userId, platform, is_active: true },
