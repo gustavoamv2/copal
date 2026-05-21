@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  X, Pencil, Check, Heart, MessageCircle, Send,
+  X, Check, Heart, MessageCircle, Send,
   Bookmark, ThumbsUp, Share2, MoreHorizontal, ChevronLeft,
   Trash2, Zap, ExternalLink,
 } from "lucide-react";
@@ -356,6 +356,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           media: (post.post_media ?? []).map((pm) => pm.media_asset),
           platforms: publishPlatforms,
           instagramType: instagramType as "feed" | "story" | "carousel",
+          facebookType: "post" as "post" | "reel",
         },
       },
     });
@@ -506,11 +507,8 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                   <Button size="sm" variant="ghost" onClick={onClose}>
                     Cerrar
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5">
-                    <Pencil className="h-3.5 w-3.5" /> Editar
-                  </Button>
                   <Button size="sm" variant="outline" onClick={handleReprogramar} className="gap-1.5">
-                    <ExternalLink className="h-3.5 w-3.5" /> Reprogramar
+                    <ExternalLink className="h-3.5 w-3.5" /> Reprogramar/Editar
                   </Button>
                   <Button
                     size="sm"

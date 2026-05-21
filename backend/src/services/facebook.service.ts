@@ -1,23 +1,89 @@
 import { decrypt } from "../utils/crypto";
 import { SocialAccount, MediaAsset } from "@prisma/client";
 
+export type FacebookPostType = "post" | "reel";
+
 interface PublishResult {
   platform_post_id: string;
   api_response: unknown;
 }
 
+async function uploadReel(token: string, pageId: string, caption: string, videoUrl: string): Promise<string> {
+  // Step 1: Initialize upload session
+  const initRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_reels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ upload_phase: "start", access_token: token }),
+  });
+  if (!initRes.ok) {
+    const err = (await initRes.json()) as { error?: { message: string } };
+    throw new Error(`Facebook Reels init failed: ${err.error?.message ?? initRes.status}`);
+  }
+  const initData = (await initRes.json()) as { upload_url?: string; video_id?: string };
+  if (!initData.upload_url || !initData.video_id) {
+    throw new Error("Facebook Reels: upload_url o video_id no devueltos");
+  }
+
+  // Step 2: Download video binary from Cloudinary
+  const videoRes = await fetch(videoUrl);
+  if (!videoRes.ok) throw new Error(`No se pudo descargar el video: ${videoUrl}`);
+  const videoBuffer = await videoRes.arrayBuffer();
+
+  // Step 3: Upload binary to Facebook's resumable upload URL
+  const uploadRes = await fetch(initData.upload_url, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${token}`,
+      offset: "0",
+      file_size: String(videoBuffer.byteLength),
+    },
+    body: videoBuffer,
+  });
+  if (!uploadRes.ok) {
+    throw new Error(`Facebook Reels binary upload failed: ${uploadRes.status}`);
+  }
+
+  // Step 4: Publish
+  const publishRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_reels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      upload_phase: "finish",
+      video_id: initData.video_id,
+      video_state: "PUBLISHED",
+      description: caption,
+      title: "",
+      access_token: token,
+    }),
+  });
+  if (!publishRes.ok) {
+    const err = (await publishRes.json()) as { error?: { message: string } };
+    throw new Error(`Facebook Reels publish failed: ${err.error?.message ?? publishRes.status}`);
+  }
+
+  return initData.video_id;
+}
+
 export async function publishToFacebook(
   account: SocialAccount,
   caption: string,
-  mediaAssets: MediaAsset[]
+  mediaAssets: MediaAsset[],
+  facebookType: FacebookPostType = "post"
 ): Promise<PublishResult> {
   const token = decrypt(account.access_token_enc);
   const pageId = account.account_id;
 
+  // Reel path
+  if (facebookType === "reel") {
+    const videoAsset = mediaAssets[0];
+    if (!videoAsset) throw new Error("Se requiere un video para publicar un Reel en Facebook");
+    const videoId = await uploadReel(token, pageId, caption, videoAsset.storage_url);
+    return { platform_post_id: videoId, api_response: { video_id: videoId } };
+  }
+
   let data: { id?: string; error?: { message: string } };
 
   if (mediaAssets.length === 0) {
-    // Text-only post
     const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,8 +102,6 @@ export async function publishToFacebook(
       });
       data = (await res.json()) as typeof data;
     } else {
-      // POST to /photos with no_story:false — Facebook creates both the photo AND a feed timeline story.
-      // The response includes post_id (the feed story ID) alongside the photo id.
       const photoRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -46,11 +110,9 @@ export async function publishToFacebook(
       const photoData = (await photoRes.json()) as { id?: string; post_id?: string; error?: { message: string } };
       console.log("[Facebook] /photos response:", JSON.stringify(photoData));
       if (!photoData.id) throw new Error(photoData.error?.message ?? "Failed to upload photo to Facebook");
-      // Use post_id as the platform ID when available (it's the actual feed post)
       data = { id: photoData.post_id ?? photoData.id };
     }
   } else {
-    // Multi-photo post — upload each then attach
     const photoIds: string[] = [];
     for (const asset of mediaAssets) {
       const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {

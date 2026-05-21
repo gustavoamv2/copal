@@ -2,6 +2,7 @@ import apiClient from "./client";
 
 export type SocialPlatform = "facebook" | "linkedin" | "instagram" | "whatsapp";
 export type InstagramPostType = "feed" | "story" | "carousel";
+export type FacebookPostType = "post" | "reel";
 
 export interface PublishPayload {
   content: string;
@@ -10,6 +11,7 @@ export interface PublishPayload {
   mediaIds?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  facebookType?: FacebookPostType;
   accounts?: Partial<Record<SocialPlatform, string>>;
 }
 
@@ -20,6 +22,7 @@ export const socialApi = {
       platforms: payload.platforms,
       mediaUrls: payload.mediaUrls ?? [],
       instagramType: payload.instagramType ?? "feed",
+      facebookType: payload.facebookType ?? "post",
       ...(payload.mediaIds?.length ? { mediaIds: payload.mediaIds } : {}),
       ...(payload.accounts ? { accounts: payload.accounts } : {}),
       ...(payload.scheduledAt ? { scheduledAt: payload.scheduledAt } : {}),
@@ -32,6 +35,7 @@ export const socialApi = {
       mediaUrls: payload.mediaUrls ?? [],
       scheduledAt: payload.scheduledAt,
       instagramType: payload.instagramType ?? "feed",
+      facebookType: payload.facebookType ?? "post",
       ...(payload.mediaIds?.length ? { mediaIds: payload.mediaIds } : {}),
       ...(payload.accounts ? { accounts: payload.accounts } : {}),
     }),

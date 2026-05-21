@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { socialApi, SocialPlatform, InstagramPostType } from "@/api/social";
+import { socialApi, SocialPlatform, InstagramPostType, FacebookPostType } from "@/api/social";
 
 interface PublishOptions {
   content: string;
@@ -8,6 +8,7 @@ interface PublishOptions {
   mediaIds?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  facebookType?: FacebookPostType;
   accounts?: Partial<Record<SocialPlatform, string>>;
 }
 

@@ -26,7 +26,7 @@ router.use(requireAuth);
 // Publica inmediatamente en redes sociales
 // ─────────────────────────────────────────────
 router.post('/publish', async (req: AuthRequest, res: Response) => {
-  const { content, platforms, mediaUrls, instagramType, accounts, mediaIds } = req.body;
+  const { content, platforms, mediaUrls, mediaIds, instagramType, facebookType, accounts } = req.body;
   const userId = req.user!.sub;
 
   // Validaciones
@@ -74,6 +74,7 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
         platforms,
         mediaUrls: mediaUrls || [],
         instagramType: instagramType || 'feed',
+        facebookType: facebookType || 'post',
         userId,
         accounts: accounts || undefined,
       },
@@ -98,7 +99,7 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
 // Programa un post para publicarse en el futuro
 // ─────────────────────────────────────────────
 router.post('/schedule', async (req: AuthRequest, res: Response) => {
-  const { content, platforms, mediaUrls, mediaIds, scheduledAt, instagramType, accounts } = req.body;
+  const { content, platforms, mediaUrls, mediaIds, scheduledAt, instagramType, facebookType, accounts } = req.body;
   const userId = req.user!.sub;
 
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -150,6 +151,7 @@ router.post('/schedule', async (req: AuthRequest, res: Response) => {
         mediaUrls: mediaUrls || [],
         scheduledAt,
         instagramType: instagramType || 'feed',
+        facebookType: facebookType || 'post',
         accounts: accounts || undefined,
         userId,
       },

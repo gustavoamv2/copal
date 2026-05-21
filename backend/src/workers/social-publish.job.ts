@@ -4,7 +4,7 @@
 
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { ayrshareService, SocialPlatform, InstagramPostType, AyrsharePostOptions } from '../services/ayrshare.service';
+import { ayrshareService, SocialPlatform, InstagramPostType, FacebookPostType, AyrsharePostOptions } from '../services/ayrshare.service';
 import { prisma } from '../prisma';
 import { config } from '../config';
 
@@ -16,6 +16,7 @@ export interface SocialPublishJobData {
   mediaUrls?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  facebookType?: FacebookPostType;
   userId: string;
   accounts?: AyrsharePostOptions['accounts'];
 }
@@ -27,7 +28,7 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 export const socialPublishWorker = new Worker<SocialPublishJobData>(
   QUEUE_NAME,
   async (job: Job<SocialPublishJobData>) => {
-    const { postId, dbPostId, content, platforms, mediaUrls, scheduledAt, instagramType, userId, accounts } = job.data;
+    const { postId, dbPostId, content, platforms, mediaUrls, scheduledAt, instagramType, facebookType, userId, accounts } = job.data;
 
     console.log(`[SocialPublish] Procesando post ${postId} para: ${platforms.join(', ')}`);
 
@@ -37,6 +38,7 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
       mediaUrls,
       scheduledAt,
       instagramType,
+      facebookType,
       userId,
       accounts,
     });

@@ -3,12 +3,13 @@
 
 import { prisma } from '../prisma';
 import { publishToInstagram } from './instagram.service';
-import { publishToFacebook } from './facebook.service';
+import { publishToFacebook, FacebookPostType } from './facebook.service';
 import { publishToLinkedIn } from './linkedin.service';
 import { SocialAccount, MediaAsset } from '@prisma/client';
 
 export type SocialPlatform = 'facebook' | 'linkedin' | 'instagram';
 export type InstagramPostType = 'feed' | 'story' | 'carousel';
+export type { FacebookPostType };
 
 export interface AyrsharePostOptions {
   content: string;
@@ -16,6 +17,7 @@ export interface AyrsharePostOptions {
   mediaUrls?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  facebookType?: FacebookPostType;
   userId: string;
   /** Optional: map platform → specific account DB id to use instead of findFirst */
   accounts?: Partial<Record<SocialPlatform, string>>;
@@ -31,7 +33,7 @@ export interface AyrsharePostResult {
 class NativeSocialService {
 
   async publish(options: AyrsharePostOptions): Promise<AyrsharePostResult> {
-    const { content, platforms, mediaUrls = [], userId } = options;
+    const { content, platforms, mediaUrls = [], userId, facebookType } = options;
     const platformResults: Record<string, { status: string; postUrl?: string; error?: string; socialAccountId?: string }> = {};
 
     // Construir MediaAsset[] sintéticos a partir de las URLs de Cloudinary
@@ -82,7 +84,7 @@ class NativeSocialService {
           const result = await publishToInstagram(account, content, mediaAssets, options.instagramType ?? 'feed');
           platformResults[platform] = { status: 'success', postUrl: result.platform_post_id, socialAccountId: account.id };
         } else if (platform === 'facebook') {
-          const result = await publishToFacebook(account, content, mediaAssets);
+          const result = await publishToFacebook(account, content, mediaAssets, facebookType);
           platformResults[platform] = { status: 'success', postUrl: result.platform_post_id, socialAccountId: account.id };
         } else if (platform === 'linkedin') {
           const result = await publishToLinkedIn(account, content, mediaAssets);

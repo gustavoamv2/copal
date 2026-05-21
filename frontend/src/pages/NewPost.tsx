@@ -6,7 +6,7 @@ import { postsApi } from "@/api/posts";
 import { mediaApi } from "@/api/media";
 import { accountsApi } from "@/api/accounts";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
-import type { SocialPlatform, InstagramPostType } from "@/api/social";
+import type { SocialPlatform, InstagramPostType, FacebookPostType } from "@/api/social";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,7 @@ interface PrefillData {
   media: MediaAsset[];
   platforms: SocialPlatform[];
   instagramType: InstagramPostType;
+  facebookType: FacebookPostType;
 }
 
 export function NewPost() {
@@ -49,6 +50,7 @@ export function NewPost() {
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["linkedin"]);
   const [instagramType, setInstagramType] = useState<InstagramPostType>(prefill?.instagramType ?? "feed");
+  const [facebookType, setFacebookType] = useState<FacebookPostType>(prefill?.facebookType ?? "post");
   const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<SocialPlatform, string>>>({});
   const { publish, loading: publishing } = useSocialPublish();
 
@@ -114,7 +116,7 @@ export function NewPost() {
 
     const mediaIds = selectedMedia.map((m) => m.id);
 
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, facebookType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
@@ -339,6 +341,32 @@ export function NewPost() {
                     onClick={() => setInstagramType(id)}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                       instagramType === id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tipo de contenido Facebook */}
+          {ayrPlatforms.includes("facebook") && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Tipo de contenido en Facebook</p>
+              <div className="flex gap-2">
+                {([
+                  { id: "post", label: "Publicación" },
+                  { id: "reel", label: "Reel" },
+                ] as { id: FacebookPostType; label: string }[]).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setFacebookType(id)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      facebookType === id
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background text-muted-foreground border-border hover:border-primary/50"
                     }`}
