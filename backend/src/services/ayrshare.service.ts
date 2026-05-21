@@ -24,7 +24,7 @@ export interface AyrsharePostOptions {
 export interface AyrsharePostResult {
   success: boolean;
   postId?: string;
-  platformResults?: Record<string, { status: string; postUrl?: string; error?: string }>;
+  platformResults?: Record<string, { status: string; postUrl?: string; error?: string; socialAccountId?: string }>;
   error?: string;
 }
 
@@ -32,7 +32,7 @@ class NativeSocialService {
 
   async publish(options: AyrsharePostOptions): Promise<AyrsharePostResult> {
     const { content, platforms, mediaUrls = [], userId } = options;
-    const platformResults: Record<string, { status: string; postUrl?: string; error?: string }> = {};
+    const platformResults: Record<string, { status: string; postUrl?: string; error?: string; socialAccountId?: string }> = {};
 
     // Construir MediaAsset[] sintéticos a partir de las URLs de Cloudinary
     const mediaAssets: MediaAsset[] = mediaUrls.map((url, i) => ({
@@ -48,9 +48,10 @@ class NativeSocialService {
     }));
 
     for (const platform of platforms) {
+      let account: SocialAccount | null = null;
       try {
         const specificId = options.accounts?.[platform];
-        const account = specificId
+        account = specificId
           ? await prisma.socialAccount.findFirst({
               where: { id: specificId, user_id: userId, is_active: true },
             })
@@ -65,17 +66,17 @@ class NativeSocialService {
 
         if (platform === 'instagram') {
           const result = await publishToInstagram(account, content, mediaAssets, options.instagramType ?? 'feed');
-          platformResults[platform] = { status: 'success', postUrl: result.platform_post_id };
+          platformResults[platform] = { status: 'success', postUrl: result.platform_post_id, socialAccountId: account.id };
         } else if (platform === 'facebook') {
           const result = await publishToFacebook(account, content, mediaAssets);
-          platformResults[platform] = { status: 'success', postUrl: result.platform_post_id };
+          platformResults[platform] = { status: 'success', postUrl: result.platform_post_id, socialAccountId: account.id };
         } else if (platform === 'linkedin') {
           const result = await publishToLinkedIn(account, content, mediaAssets);
-          platformResults[platform] = { status: 'success', postUrl: result.platform_post_id };
+          platformResults[platform] = { status: 'success', postUrl: result.platform_post_id, socialAccountId: account.id };
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error desconocido';
-        platformResults[platform] = { status: 'error', error: message };
+        platformResults[platform] = { status: 'error', error: message, ...(account ? { socialAccountId: account.id } : {}) };
       }
     }
 

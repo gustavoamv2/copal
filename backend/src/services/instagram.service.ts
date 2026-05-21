@@ -6,18 +6,25 @@ interface PublishResult {
   api_response: unknown;
 }
 
-async function waitForContainer(pageId: string, containerId: string, token: string, maxWaitMs = 30000): Promise<void> {
+async function waitForContainer(pageId: string, containerId: string, token: string, maxWaitMs = 60000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     const res = await fetch(
       `https://graph.facebook.com/v19.0/${containerId}?fields=status_code,status&access_token=${token}`
     );
-    const data = (await res.json()) as { status_code?: string; status?: string };
+    const data = (await res.json()) as {
+      status_code?: string;
+      status?: string;
+      error?: { message: string; type?: string; code?: number };
+    };
+    // Fail fast on any API error instead of timing out
+    if (data.error) throw new Error(`Instagram API error (${data.error.code ?? "?"}): ${data.error.message}`);
     if (data.status_code === "FINISHED") return;
-    if (data.status_code === "ERROR") throw new Error(`Instagram container error: ${data.status}`);
-    await new Promise((r) => setTimeout(r, 3000));
+    if (data.status_code === "ERROR") throw new Error(`Instagram container failed: ${data.status ?? "unknown"}`);
+    if (data.status_code === "EXPIRED") throw new Error("Instagram container expired before publishing");
+    await new Promise((r) => setTimeout(r, 4000));
   }
-  throw new Error("Instagram container timed out waiting for FINISHED status");
+  throw new Error("Instagram container timed out — media not processed within 60s");
 }
 
 export async function publishToInstagram(

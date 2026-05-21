@@ -52,7 +52,13 @@ async function processJob(job: Job<PublishJobData>): Promise<void> {
     let result: { platform_post_id: string; api_response: unknown };
 
     if (platform === "instagram") {
-      result = await publishToInstagram(social_account, caption, mediaAssets);
+      // Infer instagram type from media: video → reel, multiple → carousel, else → feed
+      const igType = mediaAssets.length > 1
+        ? "carousel"
+        : mediaAssets[0]?.file_type.startsWith("video/")
+          ? "feed" // REELS handled inside service by detecting video
+          : "feed";
+      result = await publishToInstagram(social_account, caption, mediaAssets, igType);
     } else if (platform === "facebook") {
       result = await publishToFacebook(social_account, caption, mediaAssets);
     } else if (platform === "linkedin") {

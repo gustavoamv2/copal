@@ -41,6 +41,29 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
       accounts,
     });
 
+    // Persist per-platform results as PostPlatformVariant records so errors
+    // are visible in History (failureReason reads variant.error_message)
+    if (dbPostId && result.platformResults) {
+      await Promise.allSettled(
+        Object.entries(result.platformResults)
+          .filter(([, r]) => r.socialAccountId)
+          .map(([platform, r]) =>
+            prisma.postPlatformVariant.create({
+              data: {
+                post_id: dbPostId,
+                social_account_id: r.socialAccountId!,
+                platform: platform as 'instagram' | 'facebook' | 'linkedin',
+                caption: content,
+                status: r.status === 'success' ? 'published' : 'failed',
+                platform_post_id: r.postUrl ?? null,
+                published_at: r.status === 'success' ? new Date() : null,
+                error_message: r.error ?? null,
+              },
+            }).catch(() => {})
+          )
+      );
+    }
+
     if (!result.success) {
       const details = result.platformResults
         ? Object.entries(result.platformResults)
