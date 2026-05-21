@@ -36,12 +36,21 @@ export async function publishToFacebook(
       });
       data = (await res.json()) as typeof data;
     } else {
-      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+      // Upload unpublished first, then create feed post so it appears in timeline (not just Photos album)
+      const uploadRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: asset.storage_url, caption, access_token: token }),
+        body: JSON.stringify({ url: asset.storage_url, published: false, access_token: token }),
       });
-      data = (await res.json()) as typeof data;
+      const uploadData = (await uploadRes.json()) as { id?: string; error?: { message: string } };
+      if (!uploadData.id) throw new Error(uploadData.error?.message ?? "Failed to upload photo to Facebook");
+
+      const feedRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: caption, attached_media: [{ media_fbid: uploadData.id }], access_token: token }),
+      });
+      data = (await feedRes.json()) as typeof data;
     }
   } else {
     // Multi-photo post — upload each then attach
