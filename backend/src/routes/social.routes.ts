@@ -1,12 +1,13 @@
 // src/routes/social.routes.ts
 // Agregar a tu router principal: app.use('/api/social', socialRouter)
 
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { ayrshareService, SocialPlatform } from '../services/ayrshare.service';
 import type { SocialPublishJobData } from '../workers/social-publish.job';
 import { config } from '../config';
+import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -15,14 +16,17 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 // Cola BullMQ para publicación asíncrona
 const socialQueue = new Queue<SocialPublishJobData>('social-publish', { connection });
 
-const VALID_PLATFORMS: SocialPlatform[] = ['facebook', 'linkedin', 'instagram', 'whatsapp'];
+const VALID_PLATFORMS: SocialPlatform[] = ['facebook', 'linkedin', 'instagram'];
+
+router.use(requireAuth);
 
 // ─────────────────────────────────────────────
 // POST /api/social/publish
 // Publica inmediatamente en redes sociales
 // ─────────────────────────────────────────────
-router.post('/publish', async (req: Request, res: Response) => {
+router.post('/publish', async (req: AuthRequest, res: Response) => {
   const { content, platforms, mediaUrls, instagramType } = req.body;
+  const userId = req.user!.sub;
 
   // Validaciones
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -50,6 +54,7 @@ router.post('/publish', async (req: Request, res: Response) => {
         platforms,
         mediaUrls: mediaUrls || [],
         instagramType: instagramType || 'feed',
+        userId,
       },
       {
         attempts: 3,
@@ -71,8 +76,9 @@ router.post('/publish', async (req: Request, res: Response) => {
 // POST /api/social/schedule
 // Programa un post para publicarse en el futuro
 // ─────────────────────────────────────────────
-router.post('/schedule', async (req: Request, res: Response) => {
+router.post('/schedule', async (req: AuthRequest, res: Response) => {
   const { content, platforms, mediaUrls, scheduledAt } = req.body;
+  const userId = req.user!.sub;
 
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
     return res.status(400).json({ error: 'El contenido del post es requerido' });
@@ -102,6 +108,7 @@ router.post('/schedule', async (req: Request, res: Response) => {
         platforms,
         mediaUrls: mediaUrls || [],
         scheduledAt,
+        userId,
       },
       {
         delay,
@@ -125,7 +132,7 @@ router.post('/schedule', async (req: Request, res: Response) => {
 // GET /api/social/history
 // Obtiene historial de posts publicados
 // ─────────────────────────────────────────────
-router.get('/history', async (_req: Request, res: Response) => {
+router.get('/history', async (_req: AuthRequest, res: Response) => {
   try {
     const result = await ayrshareService.getHistory(20);
 
@@ -144,7 +151,7 @@ router.get('/history', async (_req: Request, res: Response) => {
 // GET /api/social/job/:jobId
 // Consulta el estado de un job en BullMQ
 // ─────────────────────────────────────────────
-router.get('/job/:jobId', async (req: Request, res: Response) => {
+router.get('/job/:jobId', async (req: AuthRequest, res: Response) => {
   try {
     const job = await socialQueue.getJob(req.params.jobId);
 
@@ -164,7 +171,7 @@ router.get('/job/:jobId', async (req: Request, res: Response) => {
 // DELETE /api/social/post/:postId
 // Elimina un post publicado en Zernio
 // ─────────────────────────────────────────────
-router.delete('/post/:postId', async (req: Request, res: Response) => {
+router.delete('/post/:postId', async (req: AuthRequest, res: Response) => {
   try {
     const result = await ayrshareService.deletePost(req.params.postId);
 

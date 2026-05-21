@@ -14,6 +14,7 @@ export interface SocialPublishJobData {
   mediaUrls?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  userId: string;
 }
 
 const QUEUE_NAME = 'social-publish';
@@ -23,7 +24,7 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 export const socialPublishWorker = new Worker<SocialPublishJobData>(
   QUEUE_NAME,
   async (job: Job<SocialPublishJobData>) => {
-    const { postId, content, platforms, mediaUrls, scheduledAt, instagramType } = job.data;
+    const { postId, content, platforms, mediaUrls, scheduledAt, instagramType, userId } = job.data;
 
     console.log(`[SocialPublish] Procesando post ${postId} para: ${platforms.join(', ')}`);
 
@@ -33,6 +34,7 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
       mediaUrls,
       scheduledAt,
       instagramType,
+      userId,
     });
 
     if (!result.success) {
