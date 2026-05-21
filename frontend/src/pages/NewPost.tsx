@@ -95,7 +95,9 @@ export function NewPost() {
       Object.entries(selectedAccounts).filter(([p]) => ayrPlatforms.includes(p as SocialPlatform))
     ) as Partial<Record<SocialPlatform, string>>;
 
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso, instagramType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
+    const mediaIds = selectedMedia.map((m) => m.id);
+
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {

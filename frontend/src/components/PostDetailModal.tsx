@@ -272,8 +272,9 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     .map((pm) => pm.media_asset?.storage_url)
     .filter((url): url is string => Boolean(url));
 
-  const dateLabel = post.scheduled_at
-    ? new Date(post.scheduled_at).toLocaleString("es-CL", {
+  const dateRef = post.published_at ?? post.scheduled_at;
+  const dateLabel = dateRef
+    ? new Date(dateRef).toLocaleString("es-CL", {
         day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       })

@@ -7,6 +7,7 @@ export interface PublishPayload {
   content: string;
   platforms: SocialPlatform[];
   mediaUrls?: string[];
+  mediaIds?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
   accounts?: Partial<Record<SocialPlatform, string>>;
@@ -19,6 +20,7 @@ export const socialApi = {
       platforms: payload.platforms,
       mediaUrls: payload.mediaUrls ?? [],
       instagramType: payload.instagramType ?? "feed",
+      ...(payload.mediaIds?.length ? { mediaIds: payload.mediaIds } : {}),
       ...(payload.accounts ? { accounts: payload.accounts } : {}),
       ...(payload.scheduledAt ? { scheduledAt: payload.scheduledAt } : {}),
     }),

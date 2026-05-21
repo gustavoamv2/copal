@@ -26,7 +26,7 @@ router.use(requireAuth);
 // Publica inmediatamente en redes sociales
 // ─────────────────────────────────────────────
 router.post('/publish', async (req: AuthRequest, res: Response) => {
-  const { content, platforms, mediaUrls, instagramType, accounts } = req.body;
+  const { content, platforms, mediaUrls, instagramType, accounts, mediaIds } = req.body;
   const userId = req.user!.sub;
 
   // Validaciones
@@ -54,6 +54,14 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
         base_caption: content.trim(),
         status: 'pending',
         scheduled_at: null,
+        ...(Array.isArray(mediaIds) && mediaIds.length > 0 ? {
+          post_media: {
+            create: mediaIds.map((id: string, idx: number) => ({
+              media_asset_id: id,
+              order_index: idx,
+            })),
+          },
+        } : {}),
       },
     });
 
