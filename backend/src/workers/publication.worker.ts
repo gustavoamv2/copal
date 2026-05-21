@@ -51,10 +51,10 @@ async function processJob(job: Job<PublishJobData>): Promise<void> {
   try {
     let result: { platform_post_id: string; api_response: unknown };
 
+    const titleLower = post.title.toLowerCase();
+
     if (platform === "instagram") {
       // Derive instagram type from post title prefix (e.g. "Instagram Reel · …")
-      // then fall back to media heuristics.
-      const titleLower = post.title.toLowerCase();
       const igType: "feed" | "story" | "carousel" | "reel" =
         mediaAssets.length > 1
           ? "carousel"
@@ -65,7 +65,14 @@ async function processJob(job: Job<PublishJobData>): Promise<void> {
               : "feed";
       result = await publishToInstagram(social_account, caption, mediaAssets, igType);
     } else if (platform === "facebook") {
-      result = await publishToFacebook(social_account, caption, mediaAssets);
+      // Derive facebook type from post title prefix
+      const fbType: "post" | "reel" | "story" =
+        titleLower.includes("reel")
+          ? "reel"
+          : titleLower.includes("story") || titleLower.includes("historia")
+            ? "story"
+            : "post";
+      result = await publishToFacebook(social_account, caption, mediaAssets, fbType);
     } else if (platform === "linkedin") {
       result = await publishToLinkedIn(social_account, caption, mediaAssets);
     } else {

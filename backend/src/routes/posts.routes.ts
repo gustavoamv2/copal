@@ -185,6 +185,11 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
       : titleLower.includes("story") || titleLower.includes("historia")       ? "story"
       : "feed";
 
+    const fbType: "post" | "reel" | "story" =
+      titleLower.includes("reel")                                             ? "reel"
+      : titleLower.includes("story") || titleLower.includes("historia")       ? "story"
+      : "post";
+
     const errors: string[] = [];
     let successCount = 0;
 
@@ -198,7 +203,7 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
           if (variant.platform === "instagram") {
             result = await publishToInstagram(account, variant.caption, mediaAssets, igType);
           } else if (variant.platform === "facebook") {
-            result = await publishToFacebook(account, variant.caption, mediaAssets);
+            result = await publishToFacebook(account, variant.caption, mediaAssets, fbType);
           } else {
             result = await publishToLinkedIn(account, variant.caption, mediaAssets);
           }
@@ -236,7 +241,7 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
           if (platform === "instagram") {
             await publishToInstagram(account, post.base_caption, mediaAssets, igType);
           } else if (platform === "facebook") {
-            await publishToFacebook(account, post.base_caption, mediaAssets);
+            await publishToFacebook(account, post.base_caption, mediaAssets, fbType);
           } else {
             await publishToLinkedIn(account, post.base_caption, mediaAssets);
           }

@@ -418,8 +418,9 @@ export function NewPost() {
               <p className="text-xs text-muted-foreground">Tipo de contenido en Facebook</p>
               <div className="flex gap-2">
                 {([
-                  { id: "post", label: "Publicación" },
-                  { id: "reel", label: "Reel" },
+                  { id: "post",  label: "Publicación" },
+                  { id: "reel",  label: "Reel" },
+                  { id: "story", label: "Historia" },
                 ] as { id: FacebookPostType; label: string }[]).map(({ id, label }) => (
                   <button
                     key={id}

@@ -360,13 +360,17 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
       })
     : "Sin fecha";
 
-  // Detect instagram type from title
+  // Detect instagram + facebook type from title
   const titleLower = post.title.toLowerCase();
   const instagramType: "feed" | "story" | "carousel" | "reel" =
     titleLower.includes("reel")     ? "reel"
     : titleLower.includes("story")  ? "story"
     : titleLower.includes("carrusel") || titleLower.includes("carousel") ? "carousel"
     : "feed";
+  const facebookType: "post" | "reel" | "story" =
+    titleLower.includes("reel")    ? "reel"
+    : titleLower.includes("story") || titleLower.includes("historia") ? "story"
+    : "post";
 
   // Disable publish if already published successfully
   const isPublished = post.status === "published" ||
@@ -500,7 +504,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           media: (post.post_media ?? []).map((pm) => pm.media_asset),
           platforms: reprogramarPlatforms,
           instagramType,
-          facebookType: "post" as "post" | "reel",
+          facebookType,
         },
       },
     });

@@ -2,7 +2,7 @@ import apiClient from "./client";
 
 export type SocialPlatform = "facebook" | "linkedin" | "instagram" | "whatsapp";
 export type InstagramPostType = "feed" | "story" | "carousel" | "reel";
-export type FacebookPostType = "post" | "reel";
+export type FacebookPostType = "post" | "reel" | "story";
 
 export interface PublishPayload {
   content: string;

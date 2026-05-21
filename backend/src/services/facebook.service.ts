@@ -1,12 +1,80 @@
 import { decrypt } from "../utils/crypto";
 import { SocialAccount, MediaAsset } from "@prisma/client";
 
-export type FacebookPostType = "post" | "reel";
+export type FacebookPostType = "post" | "reel" | "story";
 
 interface PublishResult {
   platform_post_id: string;
   api_response: unknown;
 }
+
+// ── Facebook Stories ──────────────────────────────────────────────────────────
+
+async function publishPhotoStory(token: string, pageId: string, imageUrl: string): Promise<string> {
+  const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photo_stories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: imageUrl, access_token: token }),
+  });
+  const data = (await res.json()) as { post_id?: string; id?: string; success?: boolean; error?: { message: string } };
+  if (!res.ok) {
+    throw new Error(data.error?.message ?? `Facebook Story (foto) falló: ${res.status}`);
+  }
+  return data.post_id ?? data.id ?? "story-ok";
+}
+
+async function publishVideoStory(token: string, pageId: string, videoUrl: string): Promise<string> {
+  // Step 1: Initialize upload session
+  const initRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_stories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ upload_phase: "start", access_token: token }),
+  });
+  if (!initRes.ok) {
+    const err = (await initRes.json()) as { error?: { message: string } };
+    throw new Error(`Facebook Story video init: ${err.error?.message ?? initRes.status}`);
+  }
+  const initData = (await initRes.json()) as { upload_url?: string; video_id?: string };
+  if (!initData.upload_url || !initData.video_id) {
+    throw new Error("Facebook Story: upload_url o video_id no devueltos");
+  }
+
+  // Step 2: Download video binary from Cloudinary
+  const videoRes = await fetch(videoUrl);
+  if (!videoRes.ok) throw new Error(`No se pudo descargar el video: ${videoUrl}`);
+  const videoBuffer = await videoRes.arrayBuffer();
+
+  // Step 3: Upload binary
+  const uploadRes = await fetch(initData.upload_url, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${token}`,
+      offset: "0",
+      file_size: String(videoBuffer.byteLength),
+    },
+    body: videoBuffer,
+  });
+  if (!uploadRes.ok) throw new Error(`Facebook Story video upload: ${uploadRes.status}`);
+
+  // Step 4: Publish story
+  const publishRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_stories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      upload_phase: "finish",
+      video_id: initData.video_id,
+      video_state: "PUBLISHED",
+      access_token: token,
+    }),
+  });
+  if (!publishRes.ok) {
+    const err = (await publishRes.json()) as { error?: { message: string } };
+    throw new Error(`Facebook Story video publish: ${err.error?.message ?? publishRes.status}`);
+  }
+  return initData.video_id;
+}
+
+// ── Facebook Reels ────────────────────────────────────────────────────────────
 
 async function uploadReel(token: string, pageId: string, caption: string, videoUrl: string): Promise<string> {
   // Step 1: Initialize upload session
@@ -73,7 +141,21 @@ export async function publishToFacebook(
   const token = decrypt(account.access_token_enc);
   const pageId = account.account_id;
 
-  // Reel path
+  // ── Story path ───────────────────────────────────────────────────────────────
+  if (facebookType === "story") {
+    const asset = mediaAssets[0];
+    if (!asset) throw new Error("Se requiere una imagen o video para publicar una Historia en Facebook");
+    const isVideo = asset.file_type.startsWith("video/");
+    if (isVideo) {
+      const videoId = await publishVideoStory(token, pageId, asset.storage_url);
+      return { platform_post_id: videoId, api_response: { video_id: videoId } };
+    } else {
+      const storyId = await publishPhotoStory(token, pageId, asset.storage_url);
+      return { platform_post_id: storyId, api_response: { story_id: storyId } };
+    }
+  }
+
+  // ── Reel path ─────────────────────────────────────────────────────────────
   if (facebookType === "reel") {
     const videoAsset = mediaAssets[0];
     if (!videoAsset) throw new Error("Se requiere un video para publicar un Reel en Facebook");
