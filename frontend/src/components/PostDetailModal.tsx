@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   X, Pencil, Check, Heart, MessageCircle, Send,
   Bookmark, ThumbsUp, Share2, MoreHorizontal, ChevronLeft,
-  Trash2, Zap,
+  Trash2, Zap, ExternalLink,
 } from "lucide-react";
 import { BrandAvatar } from "@/components/BrandAvatar";
 import { Button } from "@/components/ui/button";
@@ -261,6 +262,7 @@ interface PostDetailModalProps {
 
 export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<ViewMode>("preview");
 
   const platforms    = post.variants.map((v) => v.platform as Platform);
@@ -340,6 +342,22 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     } else {
       toast({ title: res.error ?? "Error al publicar", variant: "destructive" });
     }
+  };
+
+  const handleReprogramar = () => {
+    navigate("/posts/new", {
+      state: {
+        prefill: {
+          title: post.title,
+          caption: post.base_caption,
+          scheduledAt: post.scheduled_at,
+          media: (post.post_media ?? []).map((pm) => pm.media_asset),
+          platforms: publishPlatforms,
+          instagramType: instagramType as "feed" | "story" | "carousel",
+        },
+      },
+    });
+    onClose();
   };
 
   const TAB_COLORS: Record<NetworkTab, string> = {
@@ -488,6 +506,9 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setMode("edit")} className="gap-1.5">
                     <Pencil className="h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleReprogramar} className="gap-1.5">
+                    <ExternalLink className="h-3.5 w-3.5" /> Reprogramar
                   </Button>
                   <Button
                     size="sm"

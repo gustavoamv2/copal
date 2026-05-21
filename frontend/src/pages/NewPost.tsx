@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, ImageIcon } from "lucide-react";
+import { X, ImageIcon, Info } from "lucide-react";
 import { postsApi } from "@/api/posts";
 import { mediaApi } from "@/api/media";
 import { accountsApi } from "@/api/accounts";
@@ -16,22 +16,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/useToast";
 import { MediaAsset } from "@/types";
 
+interface PrefillData {
+  title: string;
+  caption: string;
+  scheduledAt: string | null;
+  media: MediaAsset[];
+  platforms: SocialPlatform[];
+  instagramType: InstagramPostType;
+}
+
 export function NewPost() {
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
 
-  const [title, setTitle] = useState("");
-  const [baseCaption, setBaseCaption] = useState("");
+  const prefill = (location.state as { prefill?: PrefillData } | null)?.prefill ?? null;
+
+  const [title, setTitle] = useState(prefill?.title ?? "");
+  const [baseCaption, setBaseCaption] = useState(prefill?.caption ?? "");
   const [scheduledAt, setScheduledAt] = useState(() => {
+    if (prefill?.scheduledAt) {
+      const d = new Date(prefill.scheduledAt);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
     const d = new Date();
     d.setMinutes(d.getMinutes() + 5);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
-  const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>(prefill?.media ?? []);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
-  const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(["linkedin"]);
-  const [instagramType, setInstagramType] = useState<InstagramPostType>("feed");
+  const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["linkedin"]);
+  const [instagramType, setInstagramType] = useState<InstagramPostType>(prefill?.instagramType ?? "feed");
   const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<SocialPlatform, string>>>({});
   const { publish, loading: publishing } = useSocialPublish();
 
@@ -111,6 +128,15 @@ export function NewPost() {
         <h1 className="text-2xl font-bold">Nueva publicación</h1>
         <p className="text-muted-foreground text-sm mt-1">Crea y publica contenido en tus redes</p>
       </div>
+
+      {prefill && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/25 bg-blue-500/8 px-3.5 py-2.5 text-sm text-blue-400">
+          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            Datos cargados de <strong>"{prefill.title}"</strong> — modifica las plataformas, el tipo de publicación o la fecha y luego publica.
+          </span>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
