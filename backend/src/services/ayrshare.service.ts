@@ -17,6 +17,8 @@ export interface AyrsharePostOptions {
   scheduledAt?: string;
   instagramType?: InstagramPostType;
   userId: string;
+  /** Optional: map platform → specific account DB id to use instead of findFirst */
+  accounts?: Partial<Record<SocialPlatform, string>>;
 }
 
 export interface AyrsharePostResult {
@@ -47,9 +49,14 @@ class NativeSocialService {
 
     for (const platform of platforms) {
       try {
-        const account = await prisma.socialAccount.findFirst({
-          where: { user_id: userId, platform, is_active: true },
-        });
+        const specificId = options.accounts?.[platform];
+        const account = specificId
+          ? await prisma.socialAccount.findFirst({
+              where: { id: specificId, user_id: userId, is_active: true },
+            })
+          : await prisma.socialAccount.findFirst({
+              where: { user_id: userId, platform, is_active: true },
+            });
 
         if (!account) {
           platformResults[platform] = { status: 'error', error: `No hay cuenta de ${platform} conectada` };

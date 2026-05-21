@@ -4,7 +4,7 @@
 
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { ayrshareService, SocialPlatform, InstagramPostType } from '../services/ayrshare.service';
+import { ayrshareService, SocialPlatform, InstagramPostType, AyrsharePostOptions } from '../services/ayrshare.service';
 import { config } from '../config';
 
 export interface SocialPublishJobData {
@@ -15,6 +15,7 @@ export interface SocialPublishJobData {
   scheduledAt?: string;
   instagramType?: InstagramPostType;
   userId: string;
+  accounts?: AyrsharePostOptions['accounts'];
 }
 
 const QUEUE_NAME = 'social-publish';
@@ -24,7 +25,7 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 export const socialPublishWorker = new Worker<SocialPublishJobData>(
   QUEUE_NAME,
   async (job: Job<SocialPublishJobData>) => {
-    const { postId, content, platforms, mediaUrls, scheduledAt, instagramType, userId } = job.data;
+    const { postId, content, platforms, mediaUrls, scheduledAt, instagramType, userId, accounts } = job.data;
 
     console.log(`[SocialPublish] Procesando post ${postId} para: ${platforms.join(', ')}`);
 
@@ -35,10 +36,17 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
       scheduledAt,
       instagramType,
       userId,
+      accounts,
     });
 
     if (!result.success) {
-      throw new Error(`Ayrshare error: ${result.error}`);
+      const details = result.platformResults
+        ? Object.entries(result.platformResults)
+            .filter(([, v]) => v.status === 'error')
+            .map(([p, v]) => `${p}: ${v.error}`)
+            .join('; ')
+        : result.error;
+      throw new Error(`Publish failed — ${details}`);
     }
 
     console.log(`[SocialPublish] Post ${postId} publicado. ID: ${result.postId}`);

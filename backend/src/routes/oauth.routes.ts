@@ -29,7 +29,7 @@ router.get("/meta/connect", oauthAuth, (req: AuthRequest, res) => {
   const params = new URLSearchParams({
     client_id: config.META_APP_ID,
     redirect_uri: config.META_REDIRECT_URI,
-    scope: "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list",
+    scope: "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,business_management",
     response_type: "code",
     state,
   });
@@ -56,39 +56,61 @@ router.get("/meta/callback", async (req, res, next) => {
     const tokenData = (await tokenRes.json()) as { access_token?: string; error?: unknown };
     if (!tokenData.access_token) throw createError("Failed to get Meta token", 502);
 
-    // Fetch pages
+    // Fetch pages — try direct access first, then Business Manager
+    type PageEntry = { id: string; name: string; access_token: string };
+    let pages: PageEntry[] = [];
+
     const pagesRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?access_token=${tokenData.access_token}`
+      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${tokenData.access_token}`
     );
-    const pagesData = (await pagesRes.json()) as {
-      data?: Array<{ id: string; name: string; access_token: string }>;
-    };
+    const pagesData = (await pagesRes.json()) as { data?: PageEntry[] };
+    pages = pagesData.data ?? [];
 
-    if (!pagesData.data?.length) throw createError("No pages found for this Meta account", 400);
+    // Fallback: Business Manager owned pages
+    if (pages.length === 0) {
+      const bizRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/businesses?access_token=${tokenData.access_token}`
+      );
+      const bizData = (await bizRes.json()) as { data?: Array<{ id: string }> };
+      for (const biz of bizData.data ?? []) {
+        const bizPagesRes = await fetch(
+          `https://graph.facebook.com/v19.0/${biz.id}/owned_pages?fields=id,name,access_token&access_token=${tokenData.access_token}`
+        );
+        const bizPages = (await bizPagesRes.json()) as { data?: PageEntry[] };
+        pages = pages.concat(bizPages.data ?? []);
+      }
+    }
 
-    // Save each page as a separate social account
-    for (const page of pagesData.data) {
+    if (!pages.length) throw createError("No pages found for this Meta account", 400);
+
+    // Save each page and its linked Instagram account
+    for (const page of pages) {
+      // Save Facebook page
       await prisma.socialAccount.upsert({
-        where: {
-          user_id_platform_account_id: {
-            user_id: userId,
-            platform: "facebook",
-            account_id: page.id,
-          },
-        },
-        update: {
-          account_name: page.name,
-          access_token_enc: encrypt(page.access_token),
-          is_active: true,
-        },
-        create: {
-          user_id: userId,
-          platform: "facebook",
-          account_name: page.name,
-          account_id: page.id,
-          access_token_enc: encrypt(page.access_token),
-        },
+        where: { user_id_platform_account_id: { user_id: userId, platform: "facebook", account_id: page.id } },
+        update: { account_name: page.name, access_token_enc: encrypt(page.access_token), is_active: true },
+        create: { user_id: userId, platform: "facebook", account_name: page.name, account_id: page.id, access_token_enc: encrypt(page.access_token) },
       });
+
+      // Detect linked Instagram Business account
+      const igRes = await fetch(
+        `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
+      );
+      const igData = (await igRes.json()) as { instagram_business_account?: { id: string } };
+
+      if (igData.instagram_business_account?.id) {
+        const igId = igData.instagram_business_account.id;
+        const igInfoRes = await fetch(
+          `https://graph.facebook.com/v19.0/${igId}?fields=id,username&access_token=${page.access_token}`
+        );
+        const igInfo = (await igInfoRes.json()) as { id?: string; username?: string };
+
+        await prisma.socialAccount.upsert({
+          where: { user_id_platform_account_id: { user_id: userId, platform: "instagram", account_id: igId } },
+          update: { account_name: igInfo.username ?? igId, access_token_enc: encrypt(page.access_token), is_active: true },
+          create: { user_id: userId, platform: "instagram", account_name: igInfo.username ?? igId, account_id: igId, access_token_enc: encrypt(page.access_token) },
+        });
+      }
     }
 
     res.redirect(`${config.FRONTEND_URL}/accounts?connected=meta`);

@@ -25,7 +25,7 @@ router.use(requireAuth);
 // Publica inmediatamente en redes sociales
 // ─────────────────────────────────────────────
 router.post('/publish', async (req: AuthRequest, res: Response) => {
-  const { content, platforms, mediaUrls, instagramType } = req.body;
+  const { content, platforms, mediaUrls, instagramType, accounts } = req.body;
   const userId = req.user!.sub;
 
   // Validaciones
@@ -55,6 +55,7 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
         mediaUrls: mediaUrls || [],
         instagramType: instagramType || 'feed',
         userId,
+        accounts: accounts || undefined,
       },
       {
         attempts: 3,
@@ -160,7 +161,13 @@ router.get('/job/:jobId', async (req: AuthRequest, res: Response) => {
     }
 
     const state = await job.getState();
-    return res.json({ jobId: job.id, state, data: job.data });
+    return res.json({
+      jobId: job.id,
+      state,
+      data: job.data,
+      returnvalue: job.returnvalue,
+      failedReason: job.failedReason,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno';
     return res.status(500).json({ error: message });

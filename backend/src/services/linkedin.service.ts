@@ -12,7 +12,9 @@ export async function publishToLinkedIn(
   mediaAssets: MediaAsset[]
 ): Promise<PublishResult> {
   const token = decrypt(account.access_token_enc);
-  const authorUrn = `urn:li:person:${account.account_id}`;
+  const authorUrn = account.account_id.startsWith("urn:li:")
+    ? account.account_id
+    : `urn:li:person:${account.account_id}`;
 
   const body: Record<string, unknown> = {
     author: authorUrn,
