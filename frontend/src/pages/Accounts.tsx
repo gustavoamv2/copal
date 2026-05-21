@@ -1,37 +1,250 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useEffect } from "react";
-import { Link2Off, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Instagram, Facebook, Linkedin, CheckCircle2,
+  RefreshCw, Trash2, Power, MessageCircle, Loader2,
+} from "lucide-react";
 import { accountsApi } from "@/api/accounts";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { PlatformBadge } from "@/components/PlatformBadge";
-import { toast } from "@/hooks/useToast";
-import { formatDate } from "@/lib/utils";
-import { Platform } from "@/types";
+import { whatsappApi } from "@/api/whatsapp";
 import { getAccessToken } from "@/api/client";
-import axios from "axios";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/useToast";
+import type { SocialAccount } from "@/types";
+import { cn } from "@/lib/utils";
 
-const PLATFORMS: { key: Platform; name: string; description: string }[] = [
-  { key: "facebook", name: "Facebook Pages", description: "Publica en páginas de Facebook" },
-  { key: "instagram", name: "Instagram", description: "Publica via Instagram Graph API" },
-  { key: "linkedin", name: "LinkedIn", description: "Publica en tu perfil de LinkedIn" },
-];
+const BACKEND = import.meta.env.VITE_API_URL ?? "";
 
-export function Accounts() {
+// ── AccountRow ─────────────────────────────────────────────────────────────
+function AccountRow({
+  account, onToggle, onDelete,
+}: {
+  account: SocialAccount;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const isOrg = account.account_id.startsWith("urn:li:organization:");
+  const expiringSoon =
+    account.token_expires_at &&
+    new Date(account.token_expires_at).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
+
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={`h-2 w-2 rounded-full shrink-0 ${account.is_active ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">
+            {account.account_name}
+            {isOrg && <span className="ml-1.5 text-xs text-muted-foreground font-normal">(Empresa)</span>}
+          </p>
+          <p className="text-xs text-muted-foreground truncate">{account.account_id}</p>
+          {expiringSoon && (
+            <p className="text-xs text-amber-500 mt-0.5">Token expira pronto — reconecta</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0 ml-3">
+        <Button variant="ghost" size="icon" className="h-7 w-7" title={account.is_active ? "Desactivar" : "Activar"} onClick={onToggle}>
+          <Power className={cn("h-3.5 w-3.5", account.is_active ? "text-green-500" : "text-muted-foreground")} />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Desconectar" onClick={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── PlatformCard ───────────────────────────────────────────────────────────
+function PlatformCard({
+  label, icon: Icon, color, bg, accounts, onToggle, onDelete, onConnect, connectLabel,
+}: {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+  accounts: SocialAccount[];
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onConnect?: () => void;
+  connectLabel?: string;
+}) {
+  const active = accounts.filter((a) => a.is_active).length;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${bg}`}>
+            <Icon className={`h-4 w-4 ${color}`} />
+          </div>
+          {label}
+          <Badge variant="outline" className="ml-auto text-xs">
+            {active}/{accounts.length} activas
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">Sin cuentas conectadas</p>
+        ) : (
+          accounts.map((a) => (
+            <AccountRow key={a.id} account={a} onToggle={() => onToggle(a.id)} onDelete={() => onDelete(a.id)} />
+          ))
+        )}
+        {onConnect && (
+          <Button variant="outline" size="sm" className="w-full mt-3 gap-2" onClick={onConnect}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            {connectLabel ?? "Conectar"}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── WhatsAppPanel ──────────────────────────────────────────────────────────
+function WhatsAppPanel() {
   const qc = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [phone, setPhone] = useState("");
+  const [connecting, setConnecting] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ["whatsapp-status"],
+    queryFn: () => whatsappApi.status().then((r) => r.data),
+    refetchInterval: connecting ? 3000 : false,
+  });
+
+  const status = data?.status ?? "disconnected";
+  const pairingCode = data?.pairingCode;
+
+  useEffect(() => {
+    if (status === "connected" && connecting) {
+      setConnecting(false);
+      toast({ title: "WhatsApp conectado ✓" });
+    }
+  }, [status, connecting]);
+
+  const handleConnect = async () => {
+    if (!phone.trim()) return;
+    setConnecting(true);
+    try {
+      await whatsappApi.connect(phone.replace(/\D/g, ""));
+      qc.invalidateQueries({ queryKey: ["whatsapp-status"] });
+    } catch {
+      toast({ title: "Error al iniciar conexión", variant: "destructive" });
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await whatsappApi.disconnect();
+      qc.invalidateQueries({ queryKey: ["whatsapp-status"] });
+      toast({ title: "WhatsApp desconectado" });
+    } catch {
+      toast({ title: "Error al desconectar", variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#25D366]/10">
+            <MessageCircle className="h-4 w-4 text-[#25D366]" />
+          </div>
+          WhatsApp Business
+          <Badge
+            variant="outline"
+            className={cn(
+              "ml-auto text-xs",
+              status === "connected" && "border-green-500 text-green-500",
+              status === "qr_pending" && "border-amber-500 text-amber-500",
+              status === "disconnected" && "border-muted-foreground/50 text-muted-foreground"
+            )}
+          >
+            {status === "connected" ? "Conectado" : status === "qr_pending" ? "Conectando…" : "Desconectado"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {status === "connected" ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-green-500">
+              <CheckCircle2 className="h-4 w-4" />
+              Listo para publicar estados
+            </div>
+            <Button variant="outline" size="sm" onClick={handleDisconnect}>Desconectar</Button>
+          </div>
+        ) : status === "qr_pending" && pairingCode ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Ingresa este código en WhatsApp Business:</p>
+            <div className="flex items-center gap-3">
+              <div className="font-mono text-2xl font-bold tracking-widest bg-muted px-4 py-2 rounded-md">
+                {pairingCode}
+              </div>
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ajustes → Dispositivos vinculados → Vincular con número de teléfono
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {status === "qr_pending" && (
+              <div className="flex items-center gap-2 text-sm text-amber-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generando código…
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Número de WhatsApp Business (con código de país)</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="56912345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="flex-1"
+                disabled={connecting}
+                onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+              />
+              <Button size="sm" onClick={handleConnect} disabled={!phone.trim() || connecting}>
+                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Conectar"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+export function Accounts() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qc = useQueryClient();
 
   useEffect(() => {
     const connected = searchParams.get("connected");
-    if (connected) {
-      toast({ title: `Cuenta de ${connected} conectada correctamente` });
+    if (connected === "meta") {
+      toast({ title: "Facebook e Instagram conectados ✓" });
+      setSearchParams({}, { replace: true });
+    } else if (connected === "linkedin") {
+      toast({ title: "LinkedIn conectado ✓" });
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: accounts, isLoading } = useQuery({
+  const { data: accounts = [], isLoading } = useQuery({
     queryKey: ["accounts"],
     queryFn: () => accountsApi.list().then((r) => r.data),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (id: string) => accountsApi.toggle(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
   });
 
   const deleteMutation = useMutation({
@@ -43,120 +256,63 @@ export function Accounts() {
     onError: () => toast({ title: "Error al desconectar", variant: "destructive" }),
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: (id: string) => accountsApi.toggle(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
-  });
+  const connectOAuth = (path: string) => {
+    const token = getAccessToken();
+    if (!token) { toast({ title: "Sesión expirada, recarga la página", variant: "destructive" }); return; }
+    window.location.href = `${BACKEND}/api/oauth/${path}/connect?token=${token}`;
+  };
 
-  const accountsByPlatform = (platform: Platform) =>
-    (accounts ?? []).filter((a) => a.platform === platform);
+  const fb = accounts.filter((a) => a.platform === "facebook");
+  const ig = accounts.filter((a) => a.platform === "instagram");
+  const li = accounts.filter((a) => a.platform === "linkedin");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold">Cuentas conectadas</h1>
-        <p className="text-muted-foreground text-sm mt-1">Administra tus conexiones a redes sociales</p>
+        <p className="text-muted-foreground text-sm mt-1">Administra tus redes sociales conectadas</p>
       </div>
 
-      <div className="grid gap-4">
-        {PLATFORMS.map(({ key, name, description }) => {
-          const connected = accountsByPlatform(key);
-          return (
-            <Card key={key}>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div className="flex items-center gap-3">
-                  <PlatformBadge platform={key} />
-                  <div>
-                    <CardTitle className="text-base">{name}</CardTitle>
-                    <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-  const endpoint = key === "linkedin" ? "linkedin" : "meta";
-  let token = getAccessToken();
-  if (!token) {
-    try {
-      const { data } = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/auth/refresh`,
-        {},
-        { withCredentials: true }
-      );
-      token = data.access_token;
-    } catch {
-      window.location.href = "/login";
-      return;
-    }
-  }
-  window.location.href = `${import.meta.env.VITE_API_URL}/api/oauth/${endpoint}/connect?token=${token}`;
-}}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  {connected.length ? "Reconectar" : "Conectar"}
-                </Button>
-              </CardHeader>
-              {connected.length > 0 && (
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    {connected.map((acc) => {
-                      const expired =
-                        acc.token_expires_at && new Date(acc.token_expires_at) < new Date();
-                      return (
-                        <div
-                          key={acc.id}
-                          className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2.5"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {acc.is_active && !expired ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-yellow-400 shrink-0" />
-                            )}
-                            <span className="text-sm font-medium truncate">{acc.account_name}</span>
-                            {expired && (
-                              <span className="text-xs text-yellow-400">Token expirado</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {acc.token_expires_at && (
-                              <span className="text-xs text-muted-foreground hidden sm:block">
-                                Expira {formatDate(acc.token_expires_at)}
-                              </span>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleMutation.mutate(acc.id)}
-                              className="text-xs"
-                            >
-                              {acc.is_active ? "Pausar" : "Activar"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={() => deleteMutation.mutate(acc.id)}
-                            >
-                              <Link2Off className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              )}
-              {!isLoading && connected.length === 0 && (
-                <CardContent className="pt-0">
-                  <p className="text-sm text-muted-foreground">Sin cuentas conectadas</p>
-                </CardContent>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-lg bg-muted animate-pulse" />)}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <PlatformCard
+            label="Facebook"
+            icon={Facebook}
+            color="text-[#1877F2]"
+            bg="bg-[#1877F2]/10"
+            accounts={fb}
+            onToggle={(id) => toggleMutation.mutate(id)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onConnect={() => connectOAuth("meta")}
+            connectLabel={fb.length > 0 ? "Reconectar Facebook & Instagram" : "Conectar Facebook & Instagram"}
+          />
+          <PlatformCard
+            label="Instagram"
+            icon={Instagram}
+            color="text-[#E1306C]"
+            bg="bg-[#E1306C]/10"
+            accounts={ig}
+            onToggle={(id) => toggleMutation.mutate(id)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+          />
+          <PlatformCard
+            label="LinkedIn"
+            icon={Linkedin}
+            color="text-[#0A66C2]"
+            bg="bg-[#0A66C2]/10"
+            accounts={li}
+            onToggle={(id) => toggleMutation.mutate(id)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onConnect={() => connectOAuth("linkedin")}
+            connectLabel={li.length > 0 ? "Reconectar LinkedIn" : "Conectar LinkedIn"}
+          />
+          <WhatsAppPanel />
+        </div>
+      )}
     </div>
   );
 }

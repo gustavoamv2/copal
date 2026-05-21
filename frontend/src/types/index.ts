@@ -95,6 +95,7 @@ export interface PublicationLog {
 export interface DashboardMetrics {
   scheduled: number;
   publishedToday: number;
+  published: number;
   drafts: number;
   failed: number;
   upcoming: ScheduledPublication[];

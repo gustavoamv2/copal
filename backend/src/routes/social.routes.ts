@@ -6,6 +6,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { ayrshareService, SocialPlatform } from '../services/ayrshare.service';
 import type { SocialPublishJobData } from '../workers/social-publish.job';
+import { prisma } from '../prisma';
 import { config } from '../config';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 
@@ -45,11 +46,22 @@ router.post('/publish', async (req: AuthRequest, res: Response) => {
   }
 
   try {
-    // Encolar el job en BullMQ (publicación asíncrona)
+    // Crear registro Post en BD para tracking de métricas
+    const dbPost = await prisma.post.create({
+      data: {
+        user_id: userId,
+        title: content.trim().slice(0, 80) || 'Sin título',
+        base_caption: content.trim(),
+        status: 'pending',
+        scheduled_at: null,
+      },
+    });
+
     const job = await socialQueue.add(
       'publish-now',
       {
         postId: `post_${Date.now()}`,
+        dbPostId: dbPost.id,
         content: content.trim(),
         platforms,
         mediaUrls: mediaUrls || [],

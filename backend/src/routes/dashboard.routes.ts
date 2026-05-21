@@ -13,11 +13,12 @@ router.get("/metrics", async (req: AuthRequest, res, next) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [scheduled, publishedToday, drafts, failed, upcoming] = await Promise.all([
+    const [scheduled, publishedToday, published, drafts, failed, upcoming] = await Promise.all([
       prisma.post.count({ where: { user_id: userId, status: "scheduled" } }),
       prisma.post.count({
         where: { user_id: userId, status: "published", published_at: { gte: today, lt: tomorrow } },
       }),
+      prisma.post.count({ where: { user_id: userId, status: "published" } }),
       prisma.post.count({ where: { user_id: userId, status: "draft" } }),
       prisma.post.count({ where: { user_id: userId, status: "failed" } }),
       prisma.scheduledPublication.findMany({
@@ -35,7 +36,7 @@ router.get("/metrics", async (req: AuthRequest, res, next) => {
       }),
     ]);
 
-    res.json({ scheduled, publishedToday, drafts, failed, upcoming });
+    res.json({ scheduled, publishedToday, published, drafts, failed, upcoming });
   } catch (err) {
     next(err);
   }

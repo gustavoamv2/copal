@@ -5,10 +5,12 @@
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { ayrshareService, SocialPlatform, InstagramPostType, AyrsharePostOptions } from '../services/ayrshare.service';
+import { prisma } from '../prisma';
 import { config } from '../config';
 
 export interface SocialPublishJobData {
   postId: string;
+  dbPostId?: string; // Post record id in DB (if created by social route)
   content: string;
   platforms: SocialPlatform[];
   mediaUrls?: string[];
@@ -25,7 +27,7 @@ const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null })
 export const socialPublishWorker = new Worker<SocialPublishJobData>(
   QUEUE_NAME,
   async (job: Job<SocialPublishJobData>) => {
-    const { postId, content, platforms, mediaUrls, scheduledAt, instagramType, userId, accounts } = job.data;
+    const { postId, dbPostId, content, platforms, mediaUrls, scheduledAt, instagramType, userId, accounts } = job.data;
 
     console.log(`[SocialPublish] Procesando post ${postId} para: ${platforms.join(', ')}`);
 
@@ -46,21 +48,25 @@ export const socialPublishWorker = new Worker<SocialPublishJobData>(
             .map(([p, v]) => `${p}: ${v.error}`)
             .join('; ')
         : result.error;
+
+      if (dbPostId) {
+        await prisma.post.update({
+          where: { id: dbPostId },
+          data: { status: 'failed' },
+        }).catch(() => {});
+      }
+
       throw new Error(`Publish failed — ${details}`);
     }
 
-    console.log(`[SocialPublish] Post ${postId} publicado. ID: ${result.postId}`);
+    if (dbPostId) {
+      await prisma.post.update({
+        where: { id: dbPostId },
+        data: { status: 'published', published_at: new Date() },
+      }).catch(() => {});
+    }
 
-    // Aquí puedes actualizar el estado del post en Prisma
-    // await prisma.post.update({
-    //   where: { id: postId },
-    //   data: {
-    //     publishedAt: new Date(),
-    //     zernioPostId: result.postId,
-    //     status: 'PUBLISHED',
-    //   },
-    // });
-
+    console.log(`[SocialPublish] Post ${postId} publicado.`);
     return result;
   },
   {

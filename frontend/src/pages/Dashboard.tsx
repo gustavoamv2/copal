@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
-  CalendarClock, CheckCircle2, FileText, AlertCircle,
+  CalendarClock, CheckCircle2, FileText, AlertCircle, TrendingUp,
   PenSquare, Instagram, Facebook, Linkedin,
 } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
@@ -176,15 +176,16 @@ export function Dashboard() {
 
       {/* ── Metrics ─────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
             <Card key={i}><CardContent className="pt-6"><div className="h-16 animate-pulse bg-muted rounded-md" /></CardContent></Card>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <MetricCard icon={CalendarClock} label="Programadas"    value={data?.scheduled ?? 0}     color="bg-violet-500/10 text-violet-400" />
           <MetricCard icon={CheckCircle2}  label="Publicadas hoy" value={data?.publishedToday ?? 0} color="bg-green-500/10 text-green-400" />
+          <MetricCard icon={TrendingUp}    label="Publicadas"     value={data?.published ?? 0}      color="bg-emerald-500/10 text-emerald-400" />
           <MetricCard icon={FileText}      label="Borradores"     value={data?.drafts ?? 0}         color="bg-blue-500/10 text-blue-400" />
           <MetricCard icon={AlertCircle}   label="Fallidas"       value={data?.failed ?? 0}         color="bg-red-500/10 text-red-400" />
         </div>

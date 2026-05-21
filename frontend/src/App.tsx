@@ -12,6 +12,7 @@ import { Media } from "@/pages/Media";
 import { Scheduled } from "@/pages/Scheduled";
 import { History } from "@/pages/History";
 import { Settings } from "@/pages/Settings";
+import { Accounts } from "@/pages/Accounts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ export function App() {
               <Route path="/scheduled"  element={<Scheduled />} />
               <Route path="/history"    element={<History />} />
               <Route path="/settings"   element={<Settings />} />
+              <Route path="/accounts"  element={<Accounts />} />
 
               {/* Catch-all: redirect stale URLs to dashboard */}
               <Route path="*" element={<Navigate to="/" replace />} />
