@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, ImageIcon } from "lucide-react";
 import { postsApi } from "@/api/posts";
 import { mediaApi } from "@/api/media";
+import { accountsApi } from "@/api/accounts";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
 import type { SocialPlatform, InstagramPostType } from "@/api/social";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/useToast";
 import { MediaAsset } from "@/types";
 
@@ -30,12 +32,24 @@ export function NewPost() {
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(["linkedin"]);
   const [instagramType, setInstagramType] = useState<InstagramPostType>("feed");
+  const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<SocialPlatform, string>>>({});
   const { publish, loading: publishing } = useSocialPublish();
 
-  const toggleAyrPlatform = (p: SocialPlatform) =>
-    setAyrPlatforms((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-    );
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => accountsApi.list().then((r) => r.data),
+  });
+  const allAccounts = accountsData ?? [];
+
+  const accountsForPlatform = (p: SocialPlatform) =>
+    allAccounts.filter((a) => a.platform === p && a.is_active);
+
+  const toggleAyrPlatform = (p: SocialPlatform) => {
+    setAyrPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
+    if (ayrPlatforms.includes(p)) {
+      setSelectedAccounts((prev) => { const next = { ...prev }; delete next[p]; return next; });
+    }
+  };
 
   const { data: media } = useQuery({
     queryKey: ["media", { limit: 30 }],
@@ -77,7 +91,11 @@ export function NewPost() {
       return;
     }
 
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso, instagramType });
+    const accounts = Object.fromEntries(
+      Object.entries(selectedAccounts).filter(([p]) => ayrPlatforms.includes(p as SocialPlatform))
+    ) as Partial<Record<SocialPlatform, string>>;
+
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, scheduledAt: scheduledIso, instagramType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
@@ -210,31 +228,68 @@ export function NewPost() {
         <div className="border border-border rounded-lg p-4 space-y-3">
           <p className="text-sm font-medium">Publicar en redes sociales</p>
 
-          {/* Selector de plataformas */}
-          <div className="flex flex-wrap gap-2">
+          {/* Selector de plataformas + cuenta */}
+          <div className="space-y-2">
             {([
-              { id: "facebook", label: "Facebook", disabled: false },
-              { id: "instagram", label: "Instagram", disabled: false },
-              { id: "linkedin", label: "LinkedIn", disabled: false },
-              { id: "whatsapp", label: "WhatsApp", disabled: true },
-            ] as { id: SocialPlatform; label: string; disabled: boolean }[]).map(({ id, label, disabled }) => (
-              <button
-                key={id}
-                type="button"
-                disabled={disabled}
-                onClick={() => !disabled && toggleAyrPlatform(id)}
-                title={disabled ? "Próximamente" : undefined}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  disabled
-                    ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
-                    : ayrPlatforms.includes(id)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                }`}
-              >
-                {label}{disabled ? " · Próximamente" : ""}
-              </button>
-            ))}
+              { id: "facebook",  label: "Facebook" },
+              { id: "instagram", label: "Instagram" },
+              { id: "linkedin",  label: "LinkedIn" },
+            ] as { id: SocialPlatform; label: string }[]).map(({ id, label }) => {
+              const accs = accountsForPlatform(id);
+              const isOn = ayrPlatforms.includes(id);
+              return (
+                <div key={id} className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => toggleAyrPlatform(id)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      isOn
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                  {isOn && accs.length > 1 && (
+                    <Select
+                      value={selectedAccounts[id] ?? "__auto__"}
+                      onValueChange={(v) =>
+                        setSelectedAccounts((prev) => ({
+                          ...prev,
+                          [id]: v === "__auto__" ? undefined : v,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-7 text-xs w-44">
+                        <SelectValue placeholder="Cuenta automática" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__auto__">Automática</SelectItem>
+                        {accs.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.account_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {isOn && accs.length === 1 && (
+                    <span className="text-xs text-muted-foreground">{accs[0].account_name}</span>
+                  )}
+                  {isOn && accs.length === 0 && (
+                    <span className="text-xs text-amber-500">Sin cuentas — conecta en Cuentas</span>
+                  )}
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              disabled
+              title="Próximamente"
+              className="px-3 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground opacity-40 cursor-not-allowed"
+            >
+              WhatsApp · Próximamente
+            </button>
           </div>
 
           {/* Tipo de contenido Instagram */}

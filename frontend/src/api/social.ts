@@ -9,6 +9,7 @@ export interface PublishPayload {
   mediaUrls?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  accounts?: Partial<Record<SocialPlatform, string>>;
 }
 
 export const socialApi = {
@@ -18,6 +19,7 @@ export const socialApi = {
       platforms: payload.platforms,
       mediaUrls: payload.mediaUrls ?? [],
       instagramType: payload.instagramType ?? "feed",
+      ...(payload.accounts ? { accounts: payload.accounts } : {}),
       ...(payload.scheduledAt ? { scheduledAt: payload.scheduledAt } : {}),
     }),
 
@@ -27,6 +29,7 @@ export const socialApi = {
       platforms: payload.platforms,
       mediaUrls: payload.mediaUrls ?? [],
       scheduledAt: payload.scheduledAt,
+      ...(payload.accounts ? { accounts: payload.accounts } : {}),
     }),
 
   getJob: (jobId: string) =>

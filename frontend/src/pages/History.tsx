@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
 import { postsApi } from "@/api/posts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlatformBadge } from "@/components/PlatformBadge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { PostDetailModal } from "@/components/PostDetailModal";
 import { formatDateTime } from "@/lib/utils";
+import type { Post } from "@/types";
 import { Platform, PostStatus } from "@/types";
 
 const STATUS_FILTERS = ["", "published", "failed", "draft", "scheduled"];
@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function History() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const LIMIT = 20;
 
   const { data, isLoading } = useQuery({
@@ -71,7 +72,11 @@ export function History() {
           ) : (
             <div className="divide-y divide-border">
               {data.data.map((post) => (
-                <div key={post.id} className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors">
+                <div
+                  key={post.id}
+                  className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedPost(post)}
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{post.title}</p>
                     <p className="text-xs text-muted-foreground">
@@ -88,11 +93,6 @@ export function History() {
                     ))}
                   </div>
                   <StatusBadge status={post.status as PostStatus} />
-                  <Button variant="ghost" size="icon" asChild>
-                    <Link to={`/posts/${post.id}`}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
                 </div>
               ))}
             </div>
@@ -117,6 +117,10 @@ export function History() {
             Siguiente
           </Button>
         </div>
+      )}
+
+      {selectedPost && (
+        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
       )}
     </div>
   );

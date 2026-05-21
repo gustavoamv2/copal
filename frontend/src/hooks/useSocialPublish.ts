@@ -7,6 +7,7 @@ interface PublishOptions {
   mediaUrls?: string[];
   scheduledAt?: string;
   instagramType?: InstagramPostType;
+  accounts?: Partial<Record<SocialPlatform, string>>;
 }
 
 interface PublishResult {
@@ -27,8 +28,8 @@ export const useSocialPublish = () => {
     try {
       const isScheduled = !!options.scheduledAt;
       const response = isScheduled
-        ? await socialApi.schedule({ ...options, scheduledAt: options.scheduledAt! })
-        : await socialApi.publish(options);
+        ? await socialApi.schedule({ ...options, scheduledAt: options.scheduledAt!, accounts: options.accounts })
+        : await socialApi.publish({ ...options, accounts: options.accounts });
 
       const res: PublishResult = {
         success: true,
