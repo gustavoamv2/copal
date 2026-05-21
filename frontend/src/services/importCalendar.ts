@@ -204,6 +204,25 @@ export function resolveImageFiles(
 }
 
 // ---------------------------------------------------------------------------
+// fetchImageAsFile
+// Fetch a remote image URL and return a File object, or null on failure.
+// ---------------------------------------------------------------------------
+async function fetchImageAsFile(url: string): Promise<File | null> {
+  try {
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    // Extract a clean filename from the URL (strip query params and decode)
+    const raw = url.split("?")[0].split("/").pop() ?? "image.jpg";
+    const filename = decodeURIComponent(raw) || "image.jpg";
+    const mimeType = blob.type || "image/jpeg";
+    return new File([blob], filename, { type: mimeType });
+  } catch {
+    return null; // CORS or network issue
+  }
+}
+
+// ---------------------------------------------------------------------------
 // importPublication
 // ---------------------------------------------------------------------------
 export async function importPublication(
@@ -214,8 +233,24 @@ export async function importPublication(
     const mediaIds: string[] = [];
     const mediaStorageUrls: string[] = [];
 
+    // Determine which files to upload.
+    // Priority: user-selected files → URL paths in JSON → nothing
+    let filesToUpload: File[] = pub.imageFiles;
+
+    if (filesToUpload.length === 0 && pub.imagePaths.length > 0) {
+      // Try to fetch any HTTP/HTTPS image paths directly
+      const fetched: File[] = [];
+      for (const path of pub.imagePaths) {
+        if (/^https?:\/\//i.test(path)) {
+          const file = await fetchImageAsFile(path);
+          if (file) fetched.push(file);
+        }
+      }
+      if (fetched.length > 0) filesToUpload = fetched;
+    }
+
     // Upload all image files (carousel support)
-    for (const file of pub.imageFiles) {
+    for (const file of filesToUpload) {
       const res = await mediaApi.upload(file);
       mediaIds.push(res.data.id);
       mediaStorageUrls.push(res.data.storage_url);

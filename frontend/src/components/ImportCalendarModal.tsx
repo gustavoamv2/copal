@@ -58,6 +58,12 @@ function networkBadgeClass(n: ImportNetwork): string {
   }
 }
 
+/** Returns true if the publication has at least one resolvable image source */
+function hasImageSource(pub: ImportedPublication): boolean {
+  if (pub.imageFiles.length > 0) return true;
+  return pub.imagePaths.some((p) => /^https?:\/\//i.test(p));
+}
+
 function ImageDot({ pub }: { pub: ImportedPublication }) {
   const count = pub.imagePaths.length;
   if (pub.imageFiles.length > 0) {
@@ -65,6 +71,19 @@ function ImageDot({ pub }: { pub: ImportedPublication }) {
       <span className="inline-flex items-center gap-0.5" title={`${pub.imageFiles.length} imagen(es) encontrada(s)`}>
         <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
         {count > 1 && <span className="text-[10px] text-green-500 font-medium">{count}</span>}
+      </span>
+    );
+  }
+  // URL-based image: will be fetched automatically on import
+  const hasUrlImage = pub.imagePaths.some((p) => /^https?:\/\//i.test(p));
+  if (hasUrlImage) {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5"
+        title={`URL de imagen detectada — se descargará al importar (${count})`}
+      >
+        <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
+        {count > 1 && <span className="text-[10px] text-blue-400 font-medium">{count}</span>}
       </span>
     );
   }
@@ -835,7 +854,8 @@ interface ConfirmStepProps {
 
 function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
   const selected = publications.filter((p) => p.selected);
-  const withImage = selected.filter((p) => p.imageFile).length;
+  // Count posts that have at least one resolvable image (local file OR URL)
+  const withImage = selected.filter(hasImageSource).length;
   const withoutImage = selected.length - withImage;
   const withWarnings = selected.filter((p) => p.validation.warnings.length > 0).length;
   const withErrors = selected.filter((p) => !p.validation.valid).length;
@@ -875,7 +895,7 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
       skipped: results.filter((r) => r.skipped).length,
       errors: results.filter((r) => !r.success && !r.skipped).length,
       duplicates: results.filter((r) => r.duplicate).length,
-      missingImages: selected.filter((p) => p.imagePath && !p.imageFile).length,
+      missingImages: selected.filter((p) => p.imagePath && !hasImageSource(p)).length,
       results,
     };
 
