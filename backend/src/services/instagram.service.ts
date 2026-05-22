@@ -8,6 +8,14 @@ interface PublishResult {
 
 const GRAPH_API_VERSION = "v22.0";
 
+// Insert Cloudinary transformation params after /upload/ so Meta receives
+// a correctly-sized image. Only applies to Cloudinary URLs; other URLs are returned as-is.
+function cdnTransform(url: string, transform: string): string {
+  if (!url.includes("res.cloudinary.com")) return url;
+  return url.replace(/(\/upload\/)/, `$1${transform}/`);
+}
+
+
 async function waitForContainer(pageId: string, containerId: string, token: string, maxWaitMs = 90000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
@@ -58,39 +66,42 @@ export async function publishToInstagram(
   let containerId: string;
 
   if (instagramType === "story") {
-    // Stories: single media, media_type STORIES, sin caption (API no lo soporta)
     const asset = mediaAssets[0];
     const isVideo = asset.file_type.startsWith("video/");
+    // Stories: 9:16 portrait (1080x1920). Apply transform for images.
+    const mediaUrl = isVideo ? asset.storage_url : cdnTransform(asset.storage_url, "w_1080,h_1920,c_fill,f_jpg");
     const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        [isVideo ? "video_url" : "image_url"]: asset.storage_url,
+        [isVideo ? "video_url" : "image_url"]: mediaUrl,
         media_type: "STORIES",
         access_token: token,
       }),
     });
     const data = (await res.json()) as { id?: string; error?: { message: string } };
+    console.log(`[Instagram] story container response:`, JSON.stringify(data));
     if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram story container");
     containerId = data.id;
 
   } else if (instagramType === "carousel" || mediaAssets.length > 1) {
-    // Carrusel: crear item por item, esperar videos, luego crear contenedor padre
     const childIds: string[] = [];
     for (const asset of mediaAssets) {
       const isVideo = asset.file_type.startsWith("video/");
+      // Carousel items: square 1080x1080
+      const mediaUrl = isVideo ? asset.storage_url : cdnTransform(asset.storage_url, "w_1080,h_1080,c_fill,f_jpg");
       const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          [isVideo ? "video_url" : "image_url"]: asset.storage_url,
+          [isVideo ? "video_url" : "image_url"]: mediaUrl,
           is_carousel_item: true,
           access_token: token,
         }),
       });
       const data = (await res.json()) as { id?: string; error?: { message: string } };
+      console.log(`[Instagram] carousel item response:`, JSON.stringify(data));
       if (!data.id) throw new Error(data.error?.message ?? "Failed to create carousel item");
-      // Los videos dentro de carrusel también necesitan esperar FINISHED
       if (isVideo) await waitForContainer(pageId, data.id, token);
       childIds.push(data.id);
     }
@@ -98,14 +109,10 @@ export async function publishToInstagram(
     const carouselRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        media_type: "CAROUSEL",
-        children: childIds.join(","),
-        caption,
-        access_token: token,
-      }),
+      body: JSON.stringify({ media_type: "CAROUSEL", children: childIds.join(","), caption, access_token: token }),
     });
     const carouselData = (await carouselRes.json()) as { id?: string; error?: { message: string } };
+    console.log(`[Instagram] carousel container response:`, JSON.stringify(carouselData));
     if (!carouselData.id) throw new Error(carouselData.error?.message ?? "Failed to create carousel");
     containerId = carouselData.id;
 
@@ -115,23 +122,20 @@ export async function publishToInstagram(
     const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        video_url: asset.storage_url,
-        media_type: "REELS",
-        caption,
-        access_token: token,
-      }),
+      body: JSON.stringify({ video_url: asset.storage_url, media_type: "REELS", caption, access_token: token }),
     });
     const data = (await res.json()) as { id?: string; error?: { message: string } };
+    console.log(`[Instagram] reel container response:`, JSON.stringify(data));
     if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram Reel container");
     containerId = data.id;
 
   } else {
-    // Feed: imagen única
+    // Feed: imagen única, máx 1440px ancho, aspect ratio entre 4:5 y 1.91:1
     const asset = mediaAssets[0];
     const isVideo = asset.file_type.startsWith("video/");
+    const mediaUrl = isVideo ? asset.storage_url : cdnTransform(asset.storage_url, "w_1080,c_limit,f_jpg");
     const body: Record<string, string> = {
-      [isVideo ? "video_url" : "image_url"]: asset.storage_url,
+      [isVideo ? "video_url" : "image_url"]: mediaUrl,
       caption,
       access_token: token,
     };
@@ -143,6 +147,7 @@ export async function publishToInstagram(
       body: JSON.stringify(body),
     });
     const data = (await res.json()) as { id?: string; error?: { message: string } };
+    console.log(`[Instagram] feed container response:`, JSON.stringify(data));
     if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram media container");
     containerId = data.id;
   }
@@ -157,6 +162,7 @@ export async function publishToInstagram(
     body: JSON.stringify({ creation_id: containerId, access_token: token }),
   });
   const publishData = (await publishRes.json()) as { id?: string; error?: { message: string } };
+  console.log(`[Instagram] media_publish response:`, JSON.stringify(publishData));
   if (!publishData.id) throw new Error(publishData.error?.message ?? "Failed to publish Instagram post");
 
   return { platform_post_id: publishData.id, api_response: publishData };
