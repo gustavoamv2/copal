@@ -6,25 +6,42 @@ interface PublishResult {
   api_response: unknown;
 }
 
-async function waitForContainer(pageId: string, containerId: string, token: string, maxWaitMs = 60000): Promise<void> {
+const GRAPH_API_VERSION = "v22.0";
+
+async function waitForContainer(pageId: string, containerId: string, token: string, maxWaitMs = 90000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     const res = await fetch(
-      `https://graph.facebook.com/v19.0/${containerId}?fields=status_code,status&access_token=${token}`
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${containerId}?fields=status_code,status&access_token=${token}`
     );
     const data = (await res.json()) as {
       status_code?: string;
       status?: string;
       error?: { message: string; type?: string; code?: number };
     };
-    // Fail fast on any API error instead of timing out
-    if (data.error) throw new Error(`Instagram API error (${data.error.code ?? "?"}): ${data.error.message}`);
+
+    // Fail fast on any API-level error
+    if (data.error) {
+      const code = data.error.code ?? "?";
+      const msg  = data.error.message;
+      // Token expired / invalid
+      if (code === 190 || msg.toLowerCase().includes("authenticate")) {
+        throw new Error(`Token de Instagram expirado o inválido (${code}). Reconecta tu cuenta de Instagram en Ajustes.`);
+      }
+      throw new Error(`Instagram API error (${code}): ${msg}`);
+    }
+
     if (data.status_code === "FINISHED") return;
-    if (data.status_code === "ERROR") throw new Error(`Instagram container failed: ${data.status ?? "unknown"}`);
-    if (data.status_code === "EXPIRED") throw new Error("Instagram container expired before publishing");
+    if (data.status_code === "ERROR") {
+      throw new Error(`Instagram rechazó el contenido: ${data.status ?? "error desconocido"}. Verifica formato y dimensiones de la imagen.`);
+    }
+    if (data.status_code === "EXPIRED") throw new Error("Instagram container expiró antes de publicar. Intenta de nuevo.");
+    if (data.status_code === "PUBLISHED") return; // already published (e.g. retry)
+
+    // IN_PROGRESS or any other state → keep waiting
     await new Promise((r) => setTimeout(r, 4000));
   }
-  throw new Error("Instagram container timed out — media not processed within 60s");
+  throw new Error("Instagram tardó demasiado en procesar el contenido (>90s). Intenta con una imagen más pequeña.");
 }
 
 export async function publishToInstagram(
@@ -44,7 +61,7 @@ export async function publishToInstagram(
     // Stories: single media, media_type STORIES, sin caption (API no lo soporta)
     const asset = mediaAssets[0];
     const isVideo = asset.file_type.startsWith("video/");
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +79,7 @@ export async function publishToInstagram(
     const childIds: string[] = [];
     for (const asset of mediaAssets) {
       const isVideo = asset.file_type.startsWith("video/");
-      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -78,7 +95,7 @@ export async function publishToInstagram(
       childIds.push(data.id);
     }
 
-    const carouselRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+    const carouselRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -95,7 +112,7 @@ export async function publishToInstagram(
   } else if (instagramType === "reel") {
     const asset = mediaAssets[0];
     if (!asset.file_type.startsWith("video/")) throw new Error("Instagram Reels requiere un video");
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -120,7 +137,7 @@ export async function publishToInstagram(
     };
     if (isVideo) body.media_type = "REELS";
 
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -134,7 +151,7 @@ export async function publishToInstagram(
   await waitForContainer(pageId, containerId, token);
 
   // Publish container
-  const publishRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/media_publish`, {
+  const publishRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media_publish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ creation_id: containerId, access_token: token }),

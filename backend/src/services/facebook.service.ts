@@ -3,6 +3,8 @@ import { SocialAccount, MediaAsset } from "@prisma/client";
 
 export type FacebookPostType = "post" | "reel" | "story";
 
+const GRAPH_API_VERSION = "v22.0";
+
 interface PublishResult {
   platform_post_id: string;
   api_response: unknown;
@@ -11,7 +13,7 @@ interface PublishResult {
 // ── Facebook Stories ──────────────────────────────────────────────────────────
 
 async function publishPhotoStory(token: string, pageId: string, imageUrl: string): Promise<string> {
-  const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photo_stories`, {
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/photo_stories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url: imageUrl, access_token: token }),
@@ -25,7 +27,7 @@ async function publishPhotoStory(token: string, pageId: string, imageUrl: string
 
 async function publishVideoStory(token: string, pageId: string, videoUrl: string): Promise<string> {
   // Step 1: Initialize upload session
-  const initRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_stories`, {
+  const initRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/video_stories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ upload_phase: "start", access_token: token }),
@@ -57,7 +59,7 @@ async function publishVideoStory(token: string, pageId: string, videoUrl: string
   if (!uploadRes.ok) throw new Error(`Facebook Story video upload: ${uploadRes.status}`);
 
   // Step 4: Publish story
-  const publishRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_stories`, {
+  const publishRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/video_stories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -78,7 +80,7 @@ async function publishVideoStory(token: string, pageId: string, videoUrl: string
 
 async function uploadReel(token: string, pageId: string, caption: string, videoUrl: string): Promise<string> {
   // Step 1: Initialize upload session
-  const initRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_reels`, {
+  const initRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/video_reels`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ upload_phase: "start", access_token: token }),
@@ -112,7 +114,7 @@ async function uploadReel(token: string, pageId: string, caption: string, videoU
   }
 
   // Step 4: Publish
-  const publishRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/video_reels`, {
+  const publishRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/video_reels`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -166,7 +168,7 @@ export async function publishToFacebook(
   let data: { id?: string; error?: { message: string } };
 
   if (mediaAssets.length === 0) {
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: caption, access_token: token }),
@@ -177,14 +179,14 @@ export async function publishToFacebook(
     const isVideo = asset.file_type.startsWith("video/");
 
     if (isVideo) {
-      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/videos`, {
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/videos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_url: asset.storage_url, description: caption, access_token: token }),
       });
       data = (await res.json()) as typeof data;
     } else {
-      const photoRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+      const photoRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: asset.storage_url, caption, no_story: false, access_token: token }),
@@ -197,7 +199,7 @@ export async function publishToFacebook(
   } else {
     const photoIds: string[] = [];
     for (const asset of mediaAssets) {
-      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: asset.storage_url, published: false, access_token: token }),
@@ -208,7 +210,7 @@ export async function publishToFacebook(
     }
 
     const attachedMedia = photoIds.map((id) => ({ media_fbid: id }));
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: caption, attached_media: attachedMedia, access_token: token }),
