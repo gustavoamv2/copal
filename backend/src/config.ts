@@ -23,7 +23,6 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   ENCRYPTION_KEY: z.string().length(64),
   DATABASE_URL: z.string(),
-  REDIS_URL: z.string().optional(),
   META_APP_ID: z.string().default(""),
   META_APP_SECRET: z.string().default(""),
   META_REDIRECT_URI: z.string().default(""),

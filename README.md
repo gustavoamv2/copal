@@ -9,7 +9,6 @@ Aplicación web privada para publicar y programar contenido en Instagram, Facebo
 | Frontend | React 18 + TypeScript + Vite + Tailwind CSS |
 | Backend | Node.js + TypeScript + Express.js |
 | Base de datos | PostgreSQL via Prisma ORM |
-| Cola de trabajos | BullMQ + Redis |
 | Storage | Cloudinary |
 | Auth | JWT (access 15min + refresh 7d httpOnly cookie) |
 
@@ -36,7 +35,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 docker compose up -d
 ```
 
-Esto inicia PostgreSQL, Redis y el backend en `http://localhost:4000`.
+Esto inicia PostgreSQL y el backend en `http://localhost:4000`.
 
 ### 3. Migrations + seed
 
@@ -94,7 +93,7 @@ npm run dev
 | `JWT_REFRESH_SECRET` | Secret para refresh tokens (mín 32 chars) |
 | `ENCRYPTION_KEY` | 64 hex chars (32 bytes) para AES-256-GCM |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
+
 | `META_APP_ID` | ID de tu Meta App |
 | `META_APP_SECRET` | Secret de tu Meta App |
 | `META_REDIRECT_URI` | `http://localhost:4000/api/oauth/meta/callback` |
@@ -166,7 +165,7 @@ copal/
 │       │   ├── cloudinary.service.ts
 │       │   └── scheduler.service.ts
 │       ├── workers/
-│       │   └── publication.worker.ts # BullMQ worker
+│       │   └── db-scheduler.ts
 │       └── utils/
 │           ├── crypto.ts       # AES-256-GCM encrypt/decrypt
 │           └── jwt.ts          # Access + refresh tokens
@@ -209,13 +208,13 @@ copal/
 ## Flujo de publicación
 
 1. Usuario crea un post con `status: scheduled` y `scheduled_at`.
-2. El backend crea un registro en `scheduled_publications` y un job en BullMQ con delay calculado.
-3. El worker BullMQ (corriendo en el mismo proceso) se activa en el momento correcto.
+2. El backend crea un registro en `scheduled_publications`.
+3. El scheduler DB-based (corriendo en el mismo proceso) se activa en el momento correcto.
 4. Llama al adapter correspondiente (instagram/facebook/linkedin service).
 5. En caso de éxito: actualiza estado a `published`, guarda log.
 6. En caso de fallo: reintenta hasta 3 veces con backoff exponencial (1min, 2min, 4min).
 7. Después del 3er fallo: marca como `failed`. El usuario puede reintentar manualmente.
-8. Los jobs persisten en Redis y sobreviven reinicios del servidor.
+7. Las publicaciones programadas persisten en PostgreSQL y sobreviven reinicios del servidor.
 
 ---
 
