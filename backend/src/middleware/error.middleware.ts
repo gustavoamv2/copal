@@ -20,7 +20,7 @@ export function errorHandler(
 
   res.status(status).json({
     error: message,
-    ...(process.env.NODE_ENV !== "production" && status >= 500 ? { detail: err.message } : {}),
+    detail: err.message,
   });
 }
 

@@ -252,8 +252,14 @@ export async function importPublication(
     // Upload all image files (carousel support)
     for (const file of filesToUpload) {
       console.log(`[import] uploading media: ${file.name}`);
-      const res = await mediaApi.upload(file);
-      mediaIds.push(res.data.id);
+      try {
+        const res = await mediaApi.upload(file);
+        mediaIds.push(res.data.id);
+      } catch (uploadErr) {
+        const axErr = uploadErr as { response?: { data?: { error?: string; detail?: string } }; message?: string };
+        const detail = axErr?.response?.data?.detail ?? axErr?.response?.data?.error ?? (uploadErr instanceof Error ? uploadErr.message : String(uploadErr));
+        throw new Error(`Media upload failed (${file.name}): ${detail}`);
+      }
     }
 
     // If the scheduled date is in the past, fall back to draft
@@ -284,19 +290,26 @@ export async function importPublication(
     }
 
     console.log(`[import] creating post: ${pub.raw.id} | mode=${effectiveMode} | variants=${variants.length} | media=${mediaIds.length}`);
-    await postsApi.create({
-      title: titleForCalendar,
-      base_caption: pub.caption,
-      status: effectiveMode === "draft" ? "draft" : "scheduled",
-      scheduled_at: scheduledDate ? scheduledDate.toISOString() : null,
-      variants,
-      media_ids: mediaIds,
-    });
+    try {
+      await postsApi.create({
+        title: titleForCalendar,
+        base_caption: pub.caption,
+        status: effectiveMode === "draft" ? "draft" : "scheduled",
+        scheduled_at: scheduledDate ? scheduledDate.toISOString() : null,
+        variants,
+        media_ids: mediaIds,
+      });
+    } catch (createErr) {
+      const axErr = createErr as { response?: { data?: { error?: string; detail?: string } }; message?: string };
+      const detail = axErr?.response?.data?.detail ?? axErr?.response?.data?.error ?? (createErr instanceof Error ? createErr.message : String(createErr));
+      throw new Error(`Post creation failed: ${detail}`);
+    }
 
     return { success: true };
   } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+    const axiosError = err as { response?: { data?: { error?: string; detail?: string } }; message?: string };
     const message =
+      axiosError?.response?.data?.detail ??
       axiosError?.response?.data?.error ??
       (err instanceof Error ? err.message : "Error desconocido al importar");
     return { success: false, error: message };
