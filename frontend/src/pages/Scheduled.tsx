@@ -43,7 +43,9 @@ type Tab = "posts" | "jobs" | "manual";
 const POST_STATUS_FILTERS = [
   { label: "Todas", value: "" },
   { label: "Programadas", value: "scheduled" },
+  { label: "Publicadas", value: "published" },
   { label: "Borrador", value: "draft" },
+  { label: "Fallidas", value: "failed" },
 ];
 
 function PostsTab({ initialStatus = "" }: { initialStatus?: string }) {

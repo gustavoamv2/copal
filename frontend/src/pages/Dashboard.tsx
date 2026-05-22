@@ -119,10 +119,10 @@ export function Dashboard() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <MetricCard icon={CalendarClock} label="Programadas"    value={data?.scheduled ?? 0}      color="bg-violet-500/10 text-violet-400"   to="/scheduled?tab=posts&status=scheduled" />
-          <MetricCard icon={CheckCircle2}  label="Publicadas hoy" value={data?.publishedToday ?? 0}  color="bg-green-500/10 text-green-400"     to="/scheduled?tab=jobs&status=published&today=1" />
-          <MetricCard icon={TrendingUp}    label="Publicadas"     value={data?.published ?? 0}       color="bg-emerald-500/10 text-emerald-400" to="/scheduled?tab=jobs&status=published" />
+          <MetricCard icon={CheckCircle2}  label="Publicadas hoy" value={data?.publishedToday ?? 0}  color="bg-green-500/10 text-green-400"     to="/scheduled?tab=posts&status=published" />
+          <MetricCard icon={TrendingUp}    label="Publicadas"     value={data?.published ?? 0}       color="bg-emerald-500/10 text-emerald-400" to="/scheduled?tab=posts&status=published" />
           <MetricCard icon={FileText}      label="Borradores"     value={data?.drafts ?? 0}          color="bg-blue-500/10 text-blue-400"       to="/scheduled?tab=posts&status=draft" />
-          <MetricCard icon={AlertCircle}   label="Fallidas"       value={data?.failed ?? 0}          color="bg-red-500/10 text-red-400"         to="/scheduled?tab=jobs&status=failed" />
+          <MetricCard icon={AlertCircle}   label="Fallidas"       value={data?.failed ?? 0}          color="bg-red-500/10 text-red-400"         to="/scheduled?tab=posts&status=failed" />
         </div>
       )}
 
