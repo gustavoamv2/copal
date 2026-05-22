@@ -1,4 +1,4 @@
-export type ImportNetwork = "Facebook" | "Instagram" | "LinkedIn";
+export type ImportNetwork = "Facebook" | "Instagram" | "LinkedIn" | "WhatsApp";
 export type ImportMode = "draft" | "scheduled";
 
 export interface RawPublication {

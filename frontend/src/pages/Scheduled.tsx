@@ -21,6 +21,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   instagram: "bg-pink-500",
   facebook: "bg-blue-600",
   linkedin: "bg-blue-800",
+  whatsapp: "bg-green-500",
 };
 
 function PlatformDot({ platform }: { platform?: string }) {
@@ -158,6 +159,7 @@ function PostsTab({ initialStatus = "" }: { initialStatus?: string }) {
                   ? post.title.toLowerCase().includes("instagram") ? "Instagram"
                     : post.title.toLowerCase().includes("facebook") ? "Facebook"
                     : post.title.toLowerCase().includes("linkedin") ? "LinkedIn"
+                    : post.title.toLowerCase().includes("whatsapp") ? "WhatsApp"
                     : null
                   : null;
                 const inferredType = post.title.toLowerCase().includes("story") || post.title.toLowerCase().includes("reel") ? "Story/Reel"

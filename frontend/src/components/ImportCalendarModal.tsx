@@ -57,6 +57,8 @@ function networkBadgeClass(n: ImportNetwork): string {
       return "bg-blue-900 text-white";
     case "Instagram":
       return "bg-pink-600 text-white";
+    case "WhatsApp":
+      return "bg-green-600 text-white";
   }
 }
 
@@ -693,7 +695,7 @@ function PreviewStep({ publications, onChange, onBack, onNext }: PreviewStepProp
             />
           </div>
           <div className="flex gap-1">
-            {(["all", "Facebook", "Instagram", "LinkedIn"] as NetworkFilter[]).map((n) => (
+            {(["all", "Facebook", "Instagram", "LinkedIn", "WhatsApp"] as NetworkFilter[]).map((n) => (
               <Button
                 key={n}
                 variant={networkFilter === n ? "default" : "outline"}

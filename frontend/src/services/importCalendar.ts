@@ -53,7 +53,7 @@ export function validatePublication(raw: RawPublication): ValidationResult {
   ];
   const validFound = allNetworks.some((n) => {
     const lower = n.toLowerCase();
-    return lower.includes("instagram") || lower.includes("facebook") || lower.includes("linkedin");
+    return lower.includes("instagram") || lower.includes("facebook") || lower.includes("linkedin") || lower.includes("whatsapp");
   });
   if (!validFound) {
     errors.push("Debe tener al menos una red social válida (Facebook, Instagram, LinkedIn)");
@@ -92,6 +92,7 @@ export function mapNetworks(
           if (lower.includes("linkedin"))  return "LinkedIn";
           if (lower.includes("facebook"))  return "Facebook";
           if (lower.includes("instagram")) return "Instagram";
+          if (lower.includes("whatsapp"))  return "WhatsApp";
           return null;
         })
         .filter((n): n is ImportNetwork => n !== null)
@@ -132,8 +133,10 @@ export function mapPlatforms(
         return "facebook";
       case "Instagram":
         return "instagram";
+      case "WhatsApp":
+        return undefined;
     }
-  });
+  }).filter((p): p is Platform => p !== undefined);
   return { platforms, instagramType };
 }
 
