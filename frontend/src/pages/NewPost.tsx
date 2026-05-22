@@ -51,8 +51,28 @@ export function NewPost() {
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["linkedin"]);
   const [showLinkedInPages, setShowLinkedInPages] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
-  const [instagramType, setInstagramType] = useState<InstagramPostType>(prefill?.instagramType ?? "feed");
-  const [facebookType, setFacebookType] = useState<FacebookPostType>(prefill?.facebookType ?? "post");
+  const [postType, setPostType] = useState<"publicacion" | "historia" | "carrusel" | "reel">(() => {
+    if (prefill?.instagramType === "carousel") return "carrusel";
+    if (prefill?.instagramType === "story" || prefill?.facebookType === "story") return "historia";
+    if (prefill?.instagramType === "reel" || prefill?.facebookType === "reel") return "reel";
+    return "publicacion";
+  });
+
+  const getInstagramType = (): InstagramPostType => {
+    switch (postType) {
+      case "carrusel": return "carousel";
+      case "historia": return "story";
+      case "reel": return "reel";
+      default: return "feed";
+    }
+  };
+  const getFacebookType = (): FacebookPostType => {
+    switch (postType) {
+      case "historia": return "story";
+      case "reel": return "reel";
+      default: return "post";
+    }
+  };
   const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<SocialPlatform, string>>>({});
   const { publish, loading: publishing } = useSocialPublish();
 
@@ -141,23 +161,32 @@ export function NewPost() {
 
   // Platforms compatible with current type selection
   const platformCompatible = (p: SocialPlatform) => {
-    if (p === "linkedin") return instagramType === "feed" && facebookType !== "reel";
-    if (p === "facebook") return instagramType !== "carousel" && instagramType !== "story";
     if (p === "instagram") return true;
-    return true;
+    if (p === "linkedin") return postType === "publicacion";
+    if (p === "facebook") return postType === "publicacion" || postType === "reel";
+    return false;
   };
+  const whatsAppCompatible = postType === "historia";
+  const linkedinPagesCompatible = postType === "publicacion";
 
-  // When instagramType changes, prune incompatible platforms
-  const setInstagramTypeSafe = (t: InstagramPostType) => {
-    setInstagramType(t);
-    if (t === "carousel" || t === "story") {
+  // When postType changes, prune incompatible platforms
+  const setPostTypeSafe = (t: typeof postType) => {
+    setPostType(t);
+    if (t === "carrusel") {
       setAyrPlatforms((prev) => prev.filter((p) => p === "instagram"));
-    }
-  };
-  const setFacebookTypeSafe = (t: FacebookPostType) => {
-    setFacebookType(t);
-    if (t === "reel") {
-      setAyrPlatforms((prev) => prev.filter((p) => p !== "linkedin"));
+      setShowLinkedInPages(false);
+      setShowWhatsApp(false);
+    } else if (t === "historia") {
+      setAyrPlatforms((prev) => prev.filter((p) => p === "instagram"));
+      setShowLinkedInPages(false);
+    } else if (t === "reel") {
+      setAyrPlatforms((prev) => prev.filter((p) => p === "instagram" || p === "facebook"));
+      setShowLinkedInPages(false);
+      setShowWhatsApp(false);
+    } else {
+      setAyrPlatforms((prev) => prev.filter((p) => p !== "whatsapp" as SocialPlatform));
+      setShowLinkedInPages(false);
+      setShowWhatsApp(false);
     }
   };
 
@@ -207,7 +236,7 @@ export function NewPost() {
 
     const mediaIds = selectedMedia.map((m) => m.id);
 
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, facebookType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType: getInstagramType(), facebookType: getFacebookType(), accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
@@ -349,7 +378,35 @@ export function NewPost() {
         <div className="border border-border rounded-lg p-4 space-y-3">
           <p className="text-sm font-medium">Publicar en redes sociales</p>
 
-          {/* Selector de plataformas + cuenta */}
+          {/* Tipo de publicación */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Tipo de publicación</p>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { id: "publicacion" as const, label: "Publicación" },
+                { id: "historia"    as const, label: "Historia" },
+                { id: "carrusel"    as const, label: "Carrusel" },
+                { id: "reel"        as const, label: "Reel" },
+              ]).map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPostTypeSafe(id)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    postType === id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Canal */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Canal</p>
           <div className="space-y-2">
             {([
               { id: "facebook",  label: "Facebook" },
@@ -412,11 +469,14 @@ export function NewPost() {
             <div key="linkedin-pages" className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={() => setShowLinkedInPages(!showLinkedInPages)}
+                onClick={() => linkedinPagesCompatible && setShowLinkedInPages(!showLinkedInPages)}
+                disabled={!linkedinPagesCompatible && !showLinkedInPages}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  showLinkedInPages
-                    ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                  !linkedinPagesCompatible && !showLinkedInPages
+                    ? "opacity-30 cursor-not-allowed border-border text-muted-foreground"
+                    : showLinkedInPages
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
                 }`}
               >
                 LinkedIn (Empresa)
@@ -434,71 +494,22 @@ export function NewPost() {
             <div key="whatsapp" className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={() => setShowWhatsApp(!showWhatsApp)}
+                onClick={() => whatsAppCompatible && setShowWhatsApp(!showWhatsApp)}
+                disabled={!whatsAppCompatible && !showWhatsApp}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  showWhatsApp
-                    ? "bg-[#25D366]/20 text-[#25D366] border-[#25D366]/40"
-                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                  !whatsAppCompatible && !showWhatsApp
+                    ? "opacity-30 cursor-not-allowed border-border text-muted-foreground"
+                    : showWhatsApp
+                      ? "bg-[#25D366]/20 text-[#25D366] border-[#25D366]/40"
+                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
                 }`}
               >
                 WhatsApp
               </button>
             </div>
           </div>
+          </div>
 
-          {/* Tipo de contenido Instagram */}
-          {ayrPlatforms.includes("instagram") && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">Tipo de contenido en Instagram</p>
-              <div className="flex gap-2">
-                {([
-                  { id: "feed", label: "Publicación" },
-                  { id: "carousel", label: "Carrusel" },
-                  { id: "story", label: "Historia" },
-                  { id: "reel", label: "Reel" },
-                ] as { id: InstagramPostType; label: string }[]).map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setInstagramTypeSafe(id)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      instagramType === id
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tipo de contenido Facebook */}
-          {ayrPlatforms.includes("facebook") && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">Tipo de contenido en Facebook</p>
-              <div className="flex gap-2">
-                {([
-                  { id: "post",  label: "Publicación" },
-                  { id: "reel",  label: "Reel" },
-                ] as { id: FacebookPostType; label: string }[]).map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setFacebookTypeSafe(id)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      facebookType === id
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           {/* Flujo manual para LinkedIn empresa */}
           {showLinkedInPages && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-3 space-y-2">

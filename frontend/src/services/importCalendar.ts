@@ -56,7 +56,7 @@ export function validatePublication(raw: RawPublication): ValidationResult {
     return lower.includes("instagram") || lower.includes("facebook") || lower.includes("linkedin") || lower.includes("whatsapp");
   });
   if (!validFound) {
-    errors.push("Debe tener al menos una red social válida (Facebook, Instagram, LinkedIn)");
+    errors.push("Debe tener al menos una red social válida (Facebook, Instagram, LinkedIn, WhatsApp)");
   }
 
   const hasImages = (raw.imagenes && raw.imagenes.length > 0) || raw.imagen?.trim();
