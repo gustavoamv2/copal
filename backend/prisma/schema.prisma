@@ -163,6 +163,7 @@ model ScheduledPublication {
   attempt_count    Int               @default(0)
   last_attempt_at  DateTime?
   worker_job_id    String?
+  job_data         Json?
 
   post         Post                @relation(fields: [post_id], references: [id], onDelete: Cascade)
   post_variant PostPlatformVariant @relation(fields: [post_variant_id], references: [id], onDelete: Cascade)

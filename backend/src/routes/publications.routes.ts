@@ -2,7 +2,6 @@ import { Router } from "express";
 import { prisma } from "../prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import { createError } from "../middleware/error.middleware";
-import { publicationQueue } from "../workers/publication.worker";
 
 const router = Router();
 router.use(requireAuth);
@@ -53,13 +52,7 @@ router.post("/:id/retry", async (req: AuthRequest, res, next) => {
       data: { status: "pending", attempt_count: 0 },
     });
 
-    await publicationQueue.add(
-      "publish",
-      { scheduledPublicationId: pub.id },
-      { delay: 0, attempts: 3, backoff: { type: "exponential", delay: 60_000 } }
-    );
-
-    res.json({ ok: true, message: "Retry queued" });
+    res.json({ ok: true, message: "Retry scheduled" });
   } catch (err) {
     next(err);
   }

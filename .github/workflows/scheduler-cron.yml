@@ -1,0 +1,14 @@
+name: Scheduler Cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping scheduler endpoint
+        run: |
+          curl -sf "https://backend-lovat-phi-99.vercel.app/api/cron/scheduled" || true
