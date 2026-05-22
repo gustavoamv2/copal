@@ -1,59 +1,96 @@
 import { Router, Response } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import {
-  initWhatsApp,
-  getWhatsAppStatus,
-  publishWhatsAppStatus,
-  getQrDataUrl,
-  disconnectWhatsApp,
+  registerWhatsAppDevice,
+  unregisterWhatsAppDevice,
+  getWhatsAppAccount,
+  getPendingPublication,
+  reportPublicationResult,
 } from "../services/whatsapp.service";
 
 const router = Router();
-router.use(requireAuth);
 
-// GET /api/whatsapp/status
-router.get("/status", async (_req: AuthRequest, res: Response) => {
-  const { status, pairingCode } = getWhatsAppStatus();
-  const qr = await getQrDataUrl();
-  res.json({ status, qr, pairingCode });
+router.get("/status", requireAuth, async (req: AuthRequest, res: Response) => {
+  const account = await getWhatsAppAccount(req.user!.sub);
+  res.json({
+    registered: !!account,
+    deviceName: account?.account_name ?? null,
+    phoneNumber: account?.account_id ?? null,
+  });
 });
 
-// POST /api/whatsapp/connect
-// Body opcional: { phone: "56912345678" } → usa código de emparejamiento
-// Sin body → usa QR
-router.post("/connect", async (req: AuthRequest, res: Response, next) => {
-  try {
-    const { phone } = req.body ?? {};
-    initWhatsApp(phone); // no await — corre en background
-    const method = phone ? "pairing_code" : "qr";
-    res.json({ message: `Iniciando WhatsApp (método: ${method}) — polling GET /status`, method });
-  } catch (err) {
-    next(err);
-  }
+router.post("/register", requireAuth, async (req: AuthRequest, res: Response) => {
+  const { deviceName, phoneNumber } = req.body ?? {};
+  if (!phoneNumber) return res.status(400).json({ error: "phoneNumber es requerido" });
+
+  const account = await registerWhatsAppDevice(req.user!.sub, deviceName || "Android", phoneNumber);
+  res.json({ registered: true, phoneNumber: account.account_id, userId: req.user!.sub });
 });
 
-// DELETE /api/whatsapp/connect — cierra sesión
-router.delete("/connect", async (_req: AuthRequest, res: Response, next) => {
-  try {
-    await disconnectWhatsApp();
-    res.json({ message: "Sesión de WhatsApp cerrada" });
-  } catch (err) {
-    next(err);
-  }
+router.delete("/register", requireAuth, async (req: AuthRequest, res: Response) => {
+  await unregisterWhatsAppDevice(req.user!.sub);
+  res.json({ ok: true });
 });
 
-// POST /api/whatsapp/status/publish
-router.post("/status/publish", async (req: AuthRequest, res: Response, next) => {
-  try {
-    const { caption, mediaUrl } = req.body;
-    if (!caption && !mediaUrl) {
-      return res.status(400).json({ error: "Se requiere caption o mediaUrl" });
-    }
-    const result = await publishWhatsAppStatus(caption ?? "", mediaUrl);
-    return res.json({ success: true, id: result.id });
-  } catch (err) {
-    next(err);
+router.get("/pending", async (req, res: Response) => {
+  const userId = req.query.userId as string;
+  if (!userId) return res.status(400).json({ error: "userId es requerido" });
+
+  const pending = await getPendingPublication(userId);
+  if (!pending) return res.json(null);
+
+  res.json(pending);
+});
+
+router.post("/callback", async (req, res: Response) => {
+  const { id, userId, success, error } = req.body ?? {};
+  if (!id || !userId) return res.status(400).json({ error: "id y userId son requeridos" });
+
+  await reportPublicationResult(id, userId, !!success, error);
+  res.json({ ok: true });
+});
+
+router.post("/status/publish", requireAuth, async (req: AuthRequest, res: Response) => {
+  const { caption, mediaUrls } = req.body ?? {};
+  if (!caption && !mediaUrls?.length) {
+    return res.status(400).json({ error: "caption o mediaUrls requerido" });
   }
+
+  const account = await getWhatsAppAccount(req.user!.sub);
+  if (!account) return res.status(400).json({ error: "WhatsApp no registrado. Registra tu dispositivo primero." });
+
+  const { prisma } = await import("../prisma");
+
+  const post = await prisma.post.create({
+    data: {
+      user_id: req.user!.sub,
+      title: (caption || "Estado WhatsApp").slice(0, 80),
+      base_caption: caption || "",
+      status: "pending",
+    },
+  });
+
+  const variant = await prisma.postPlatformVariant.create({
+    data: {
+      post_id: post.id,
+      social_account_id: account.id,
+      platform: "whatsapp",
+      caption: caption || "",
+      status: "pending",
+    },
+  });
+
+  await prisma.scheduledPublication.create({
+    data: {
+      post_id: post.id,
+      post_variant_id: variant.id,
+      social_account_id: account.id,
+      publish_at: new Date(),
+      status: "pending",
+    },
+  });
+
+  res.json({ ok: true, scheduledId: variant.id, message: "Enviado al dispositivo para publicacion inmediata" });
 });
 
 export default router;

@@ -1,142 +1,153 @@
-import makeWASocket, {
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore,
-} from "@whiskeysockets/baileys";
-import { Boom } from "@hapi/boom";
-import pino from "pino";
-import qrcode from "qrcode";
-import path from "path";
-import fs from "fs";
+import { prisma } from "../prisma";
+import { SocialAccount } from "@prisma/client";
 
-type WAStatus = "disconnected" | "qr_pending" | "connected";
-
-const AUTH_FOLDER = path.resolve(".baileys_auth");
-const logger = pino({ level: "silent" });
-
-let sock: ReturnType<typeof makeWASocket> | null = null;
-let currentQr: string | null = null;
-let currentPairingCode: string | null = null;
-let connectionStatus: WAStatus = "disconnected";
-let isInitializing = false;
-
-export function getWhatsAppStatus(): { status: WAStatus; pairingCode?: string } {
-  return { status: connectionStatus, pairingCode: currentPairingCode ?? undefined };
+export function getWhatsAppStatus(userId: string): { registered: boolean; deviceName?: string } {
+  return { registered: false };
 }
 
-export async function getQrDataUrl(): Promise<string | null> {
-  if (!currentQr) return null;
-  return qrcode.toDataURL(currentQr);
+export async function getWhatsAppAccount(userId: string): Promise<SocialAccount | null> {
+  return prisma.socialAccount.findFirst({
+    where: { user_id: userId, platform: "whatsapp", is_active: true },
+  });
 }
 
-export async function initWhatsApp(phoneNumber?: string): Promise<void> {
-  if (isInitializing || (sock && connectionStatus === "connected")) return;
-  isInitializing = true;
+export async function registerWhatsAppDevice(userId: string, deviceName: string, phoneNumber: string): Promise<SocialAccount> {
+  const existing = await prisma.socialAccount.findFirst({
+    where: { user_id: userId, platform: "whatsapp" },
+  });
 
-  if (!fs.existsSync(AUTH_FOLDER)) fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+  if (existing) {
+    return prisma.socialAccount.update({
+      where: { id: existing.id },
+      data: { account_name: deviceName || phoneNumber, account_id: phoneNumber, is_active: true },
+    });
+  }
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-  const { version } = await fetchLatestBaileysVersion();
-
-  const usePairingCode = !!phoneNumber && !state.creds.registered;
-
-  sock = makeWASocket({
-    version,
-    logger,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
+  return prisma.socialAccount.create({
+    data: {
+      user_id: userId,
+      platform: "whatsapp",
+      account_name: deviceName || phoneNumber,
+      account_id: phoneNumber,
+      access_token_enc: "",
+      is_active: true,
     },
-    generateHighQualityLinkPreview: false,
-    printQRInTerminal: false,
-    // Con código de emparejamiento no se emite QR
-    ...(usePairingCode ? { browser: ["copal", "Chrome", "1.0.0"] } : {}),
-  });
-
-  // Solicitar código de emparejamiento si se pasó número
-  if (usePairingCode && sock) {
-    setTimeout(async () => {
-      try {
-        const code = await sock!.requestPairingCode(phoneNumber!.replace(/\D/g, ""));
-        currentPairingCode = code;
-        console.log("[WhatsApp] Código de emparejamiento:", code);
-      } catch (e) {
-        console.error("[WhatsApp] Error solicitando código:", e);
-      }
-    }, 3000);
-  }
-
-  sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      currentQr = qr;
-      connectionStatus = "qr_pending";
-      console.log("[WhatsApp] QR generado — escanea con WhatsApp Business");
-    }
-
-    if (connection === "open") {
-      connectionStatus = "connected";
-      currentQr = null;
-      currentPairingCode = null;
-      isInitializing = false;
-      console.log("[WhatsApp] Conectado");
-    }
-
-    if (connection === "close") {
-      const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
-      const shouldReconnect = reason !== DisconnectReason.loggedOut;
-      connectionStatus = "disconnected";
-      sock = null;
-      isInitializing = false;
-      console.log("[WhatsApp] Desconectado, razón:", reason);
-
-      if (shouldReconnect) {
-        console.log("[WhatsApp] Reconectando...");
-        setTimeout(() => initWhatsApp(), 3000);
-      } else {
-        // Logged out — clear saved credentials
-        fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-      }
-    }
   });
 }
 
-export async function publishWhatsAppStatus(
-  caption: string,
-  mediaUrl?: string
-): Promise<{ id: string }> {
-  if (!sock || connectionStatus !== "connected") {
-    throw new Error("WhatsApp no está conectado");
-  }
-
-  if (mediaUrl) {
-    const res = await fetch(mediaUrl);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const contentType = res.headers.get("content-type") ?? "image/jpeg";
-    const isVideo = contentType.startsWith("video/");
-
-    const msg = await sock.sendMessage(
-      "status@broadcast",
-      isVideo
-        ? { video: buffer, caption, mimetype: contentType }
-        : { image: buffer, caption, mimetype: contentType }
-    );
-    return { id: msg?.key.id ?? "unknown" };
-  }
-
-  const msg = await sock.sendMessage("status@broadcast", { text: caption });
-  return { id: msg?.key.id ?? "unknown" };
+export async function unregisterWhatsAppDevice(userId: string): Promise<void> {
+  await prisma.socialAccount.updateMany({
+    where: { user_id: userId, platform: "whatsapp" },
+    data: { is_active: false },
+  });
 }
 
-export async function disconnectWhatsApp(): Promise<void> {
-  if (sock) {
-    await sock.logout();
-    sock = null;
-    connectionStatus = "disconnected";
-    fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+export async function getPendingPublication(userId: string) {
+  const scheduled = await prisma.scheduledPublication.findFirst({
+    where: {
+      status: "pending",
+      publish_at: { lte: new Date() },
+      post_variant: {
+        platform: "whatsapp",
+        post: { user_id: userId },
+      },
+    },
+    include: {
+      post_variant: {
+        include: {
+          post: {
+            include: {
+              post_media: {
+                include: { media_asset: true },
+                orderBy: { order_index: "asc" },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { publish_at: "asc" },
+  });
+
+  if (!scheduled) return null;
+
+  const { post_variant } = scheduled;
+  const { post } = post_variant;
+
+  const mediaUrls = post.post_media.map((pm) => pm.media_asset.storage_url);
+
+  await prisma.scheduledPublication.update({
+    where: { id: scheduled.id },
+    data: { status: "processing", attempt_count: { increment: 1 }, last_attempt_at: new Date() },
+  });
+
+  return {
+    id: scheduled.id,
+    caption: post_variant.caption,
+    mediaUrls,
+    postTitle: post.title,
+  };
+}
+
+export async function reportPublicationResult(
+  scheduledId: string,
+  userId: string,
+  success: boolean,
+  error?: string
+): Promise<void> {
+  const scheduled = await prisma.scheduledPublication.findFirst({
+    where: {
+      id: scheduledId,
+      post_variant: { platform: "whatsapp", post: { user_id: userId } },
+    },
+    include: { post_variant: { select: { id: true, post_id: true } } },
+  });
+
+  if (!scheduled) throw new Error("ScheduledPublication not found");
+
+  const isLastAttempt = scheduled.attempt_count >= 3;
+
+  if (success) {
+    await prisma.$transaction([
+      prisma.scheduledPublication.update({
+        where: { id: scheduled.id },
+        data: { status: "published" },
+      }),
+      prisma.postPlatformVariant.update({
+        where: { id: scheduled.post_variant.id },
+        data: { status: "published", published_at: new Date() },
+      }),
+    ]);
+
+    const pendingVariants = await prisma.postPlatformVariant.count({
+      where: { post_id: scheduled.post_variant.post_id, status: { notIn: ["published", "failed"] } },
+    });
+    if (pendingVariants === 0) {
+      await prisma.post.update({
+        where: { id: scheduled.post_variant.post_id },
+        data: { status: "published", published_at: new Date() },
+      });
+    }
+  } else {
+    await prisma.$transaction([
+      prisma.scheduledPublication.update({
+        where: { id: scheduled.id },
+        data: { status: isLastAttempt ? "failed" : "pending" },
+      }),
+      prisma.postPlatformVariant.update({
+        where: { id: scheduled.post_variant.id },
+        data: {
+          status: isLastAttempt ? "failed" : "scheduled",
+          error_message: error ?? "Unknown error",
+        },
+      }),
+    ]);
+
+    if (isLastAttempt) {
+      await prisma.post.update({
+        where: { id: scheduled.post_variant.post_id },
+        data: { status: "failed" },
+      });
+    }
   }
 }

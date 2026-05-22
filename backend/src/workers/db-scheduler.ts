@@ -165,6 +165,16 @@ async function processDirectJob(scheduled: {
     let platformPostId: string;
     let apiResponse: unknown;
 
+    if (platform === "whatsapp") {
+      // WhatsApp publications are handled by the phone device (MacroDroid polling)
+      // Don't fail — leave as pending. The phone will pick it up and report back.
+      await prisma.scheduledPublication.update({
+        where: { id: scheduled.id },
+        data: { status: "pending" },
+      });
+      return;
+    }
+
     if (platform === "instagram") {
       const igType: "feed" | "story" | "carousel" | "reel" =
         mediaAssets.length > 1 ? "carousel"

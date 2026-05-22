@@ -12,6 +12,7 @@ enum Platform {
   instagram
   facebook
   linkedin
+  whatsapp
 }
 
 enum PostStatus {

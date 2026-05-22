@@ -2,12 +2,20 @@ import { Router, Response } from "express";
 import { ayrshareService, SocialPlatform, InstagramPostType, FacebookPostType } from "../services/ayrshare.service";
 import { prisma } from "../prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
+import type { Platform } from "@prisma/client";
 
 const router = Router();
 
-const VALID_PLATFORMS: SocialPlatform[] = ["facebook", "linkedin", "instagram"];
+const VALID_PLATFORMS: SocialPlatform[] = ["facebook", "linkedin", "instagram", "whatsapp"];
+const API_PLATFORMS: SocialPlatform[] = ["facebook", "linkedin", "instagram"];
 
 router.use(requireAuth);
+
+function filterPlatforms(platforms: string[]): { api: SocialPlatform[]; whatsapp: boolean } {
+  const api = platforms.filter((p): p is SocialPlatform => API_PLATFORMS.includes(p as SocialPlatform));
+  const whatsapp = platforms.includes("whatsapp");
+  return { api, whatsapp };
+}
 
 router.post("/publish", async (req: AuthRequest, res: Response) => {
   const { content, platforms, mediaUrls, mediaIds, instagramType, facebookType, accounts } = req.body;
@@ -27,6 +35,8 @@ router.post("/publish", async (req: AuthRequest, res: Response) => {
       error: `Plataformas invalidas: ${invalidPlatforms.join(", ")}. Validas: ${VALID_PLATFORMS.join(", ")}`,
     });
   }
+
+  const { api: apiPlatforms, whatsapp: hasWhatsapp } = filterPlatforms(platforms);
 
   try {
     const dbPost = await prisma.post.create({
@@ -49,45 +59,81 @@ router.post("/publish", async (req: AuthRequest, res: Response) => {
       },
     });
 
-    const result = await ayrshareService.publish({
-      content: content.trim(),
-      platforms: platforms as SocialPlatform[],
-      mediaUrls: mediaUrls || [],
-      instagramType: instagramType || "feed",
-      facebookType: facebookType || "post",
-      userId,
-      accounts: accounts || undefined,
-    });
+    let allSuccess = true;
 
-    if (result.platformResults) {
-      await Promise.allSettled(
-        Object.entries(result.platformResults)
-          .filter(([, r]) => r.socialAccountId)
-          .map(([platform, r]) =>
-            prisma.postPlatformVariant.create({
-              data: {
-                post_id: dbPost.id,
-                social_account_id: r.socialAccountId!,
-                platform: platform as "instagram" | "facebook" | "linkedin",
-                caption: content.trim(),
-                status: r.status === "success" ? "published" : "failed",
-                platform_post_id: r.postUrl ?? null,
-                published_at: r.status === "success" ? new Date() : null,
-                error_message: r.error ?? null,
-              },
-            }).catch(() => {})
-          )
-      );
+    if (apiPlatforms.length > 0) {
+      const result = await ayrshareService.publish({
+        content: content.trim(),
+        platforms: apiPlatforms,
+        mediaUrls: mediaUrls || [],
+        instagramType: instagramType || "feed",
+        facebookType: facebookType || "post",
+        userId,
+        accounts: accounts || undefined,
+      });
+
+      if (result.platformResults) {
+        await Promise.allSettled(
+          Object.entries(result.platformResults)
+            .filter(([, r]) => r.socialAccountId)
+            .map(([platform, r]) =>
+              prisma.postPlatformVariant.create({
+                data: {
+                  post_id: dbPost.id,
+                  social_account_id: r.socialAccountId!,
+                  platform: platform as Platform,
+                  caption: content.trim(),
+                  status: r.status === "success" ? "published" : "failed",
+                  platform_post_id: r.postUrl ?? null,
+                  published_at: r.status === "success" ? new Date() : null,
+                  error_message: r.error ?? null,
+                },
+              }).catch(() => {})
+            )
+        );
+      }
+
+      if (!result.success) allSuccess = false;
     }
 
-    const postStatus = result.success ? "published" : "failed";
+    if (hasWhatsapp) {
+      const waAccount = await prisma.socialAccount.findFirst({
+        where: { user_id: userId, platform: "whatsapp", is_active: true },
+      });
+
+      if (waAccount) {
+        const variant = await prisma.postPlatformVariant.create({
+          data: {
+            post_id: dbPost.id,
+            social_account_id: waAccount.id,
+            platform: "whatsapp",
+            caption: content.trim(),
+            status: "scheduled",
+          },
+        });
+
+        await prisma.scheduledPublication.create({
+          data: {
+            post_id: dbPost.id,
+            post_variant_id: variant.id,
+            social_account_id: waAccount.id,
+            publish_at: new Date(),
+            status: "pending",
+          },
+        });
+      } else {
+        allSuccess = false;
+      }
+    }
+
+    const postStatus = allSuccess ? "published" : "failed";
     await prisma.post.update({
       where: { id: dbPost.id },
-      data: { status: postStatus, published_at: result.success ? new Date() : null },
+      data: { status: postStatus, published_at: allSuccess ? new Date() : null },
     }).catch(() => {});
 
-    if (!result.success) {
-      return res.status(500).json({ error: result.error || "Error al publicar" });
+    if (!allSuccess) {
+      return res.status(500).json({ error: "Error al publicar en una o mas plataformas" });
     }
 
     return res.json({ message: "Post publicado exitosamente", postId: dbPost.id });
@@ -118,6 +164,8 @@ router.post("/schedule", async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: "Debes seleccionar al menos una plataforma" });
   }
 
+  const { api: apiPlatforms, whatsapp: hasWhatsapp } = filterPlatforms(platforms);
+
   try {
     const dbPost = await prisma.post.create({
       data: {
@@ -139,10 +187,9 @@ router.post("/schedule", async (req: AuthRequest, res: Response) => {
       },
     });
 
-    const platformsArr = platforms as SocialPlatform[];
-    let firstVariantId: string | null = null;
+    let firstApiVariantId: string | null = null;
 
-    for (const platform of platformsArr) {
+    for (const platform of apiPlatforms) {
       let account = accounts?.[platform]
         ? await prisma.socialAccount.findFirst({
             where: { id: accounts[platform], user_id: userId, is_active: true },
@@ -163,32 +210,62 @@ router.post("/schedule", async (req: AuthRequest, res: Response) => {
         },
       });
 
-      if (!firstVariantId) firstVariantId = variant.id;
+      if (!firstApiVariantId) firstApiVariantId = variant.id;
     }
 
-    if (!firstVariantId) {
+    if (apiPlatforms.length > 0 && firstApiVariantId) {
+      await prisma.scheduledPublication.create({
+        data: {
+          post_id: dbPost.id,
+          post_variant_id: firstApiVariantId,
+          publish_at: scheduleDate,
+          status: "pending",
+          job_data: {
+            source: "ayrshare",
+            content: content.trim(),
+            platforms: apiPlatforms,
+            mediaUrls: mediaUrls || [],
+            instagramType: instagramType || "feed",
+            facebookType: facebookType || "post",
+            userId,
+            accounts: accounts || undefined,
+          },
+        },
+      });
+    }
+
+    if (hasWhatsapp) {
+      const waAccount = await prisma.socialAccount.findFirst({
+        where: { user_id: userId, platform: "whatsapp", is_active: true },
+      });
+
+      if (waAccount) {
+        const variant = await prisma.postPlatformVariant.create({
+          data: {
+            post_id: dbPost.id,
+            social_account_id: waAccount.id,
+            platform: "whatsapp",
+            caption: content.trim(),
+            status: "scheduled",
+          },
+        });
+
+        await prisma.scheduledPublication.create({
+          data: {
+            post_id: dbPost.id,
+            post_variant_id: variant.id,
+            social_account_id: waAccount.id,
+            publish_at: scheduleDate,
+            status: "pending",
+          },
+        });
+      }
+    }
+
+    if (!firstApiVariantId && !hasWhatsapp) {
       await prisma.post.delete({ where: { id: dbPost.id } });
       return res.status(400).json({ error: "No tienes cuentas conectadas para las plataformas seleccionadas" });
     }
-
-    await prisma.scheduledPublication.create({
-      data: {
-        post_id: dbPost.id,
-        post_variant_id: firstVariantId,
-        publish_at: scheduleDate,
-        status: "pending",
-        job_data: {
-          source: "ayrshare",
-          content: content.trim(),
-          platforms: platformsArr,
-          mediaUrls: mediaUrls || [],
-          instagramType: instagramType || "feed",
-          facebookType: facebookType || "post",
-          userId,
-          accounts: accounts || undefined,
-        },
-      },
-    });
 
     return res.json({ message: "Post programado exitosamente", postId: dbPost.id, scheduledAt });
   } catch (error) {

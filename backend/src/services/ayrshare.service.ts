@@ -7,7 +7,7 @@ import { publishToFacebook, FacebookPostType } from './facebook.service';
 import { publishToLinkedIn } from './linkedin.service';
 import { SocialAccount, MediaAsset } from '@prisma/client';
 
-export type SocialPlatform = 'facebook' | 'linkedin' | 'instagram';
+export type SocialPlatform = 'facebook' | 'linkedin' | 'instagram' | 'whatsapp';
 export type InstagramPostType = 'feed' | 'story' | 'carousel' | 'reel';
 export type { FacebookPostType };
 
@@ -81,6 +81,8 @@ class NativeSocialService {
         } else if (platform === 'linkedin') {
           const result = await publishToLinkedIn(account, content, mediaAssets);
           platformResults[platform] = { status: 'success', postUrl: result.platform_post_id, socialAccountId: account.id };
+        } else if (platform === 'whatsapp') {
+          platformResults[platform] = { status: 'pending', socialAccountId: account.id };
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error desconocido';

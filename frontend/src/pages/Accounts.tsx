@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Instagram, Facebook, Linkedin, CheckCircle2,
-  RefreshCw, Trash2, Power, MessageCircle, Loader2,
+  RefreshCw, Trash2, Power, MessageCircle,
 } from "lucide-react";
 import { accountsApi } from "@/api/accounts";
 import { whatsappApi } from "@/api/whatsapp";
@@ -109,51 +109,34 @@ function PlatformCard({
 function WhatsAppPanel() {
   const qc = useQueryClient();
   const [phone, setPhone] = useState("");
-  const [connecting, setConnecting] = useState(false);
-
-  const [hasPairingCode, setHasPairingCode] = useState(false);
+  const [deviceName, setDeviceName] = useState("");
 
   const { data } = useQuery({
     queryKey: ["whatsapp-status"],
     queryFn: () => whatsappApi.status().then((r) => r.data),
-    // Poll while connecting or while waiting for user to enter pairing code
-    refetchInterval: connecting || hasPairingCode ? 2000 : false,
   });
 
-  const status      = data?.status ?? "disconnected";
-  const pairingCode = data?.pairingCode ?? null;
+  const registered = data?.registered ?? false;
+  const displayPhone = data?.phoneNumber ?? "";
 
-  // Keep hasPairingCode in sync
-  useEffect(() => {
-    setHasPairingCode(!!pairingCode);
-  }, [pairingCode]);
-
-  useEffect(() => {
-    if (status === "connected" && connecting) {
-      setConnecting(false);
-      toast({ title: "WhatsApp conectado ✓" });
-    }
-  }, [status, connecting]);
-
-  const handleConnect = async () => {
+  const handleRegister = async () => {
     if (!phone.trim()) return;
-    setConnecting(true);
     try {
-      await whatsappApi.connect(phone.replace(/\D/g, ""));
+      await whatsappApi.register(deviceName.trim() || "Android", phone.replace(/\D/g, ""));
       qc.invalidateQueries({ queryKey: ["whatsapp-status"] });
+      toast({ title: "Dispositivo registrado. Configura MacroDroid en tu telefono para publicar automaticamente." });
     } catch {
-      toast({ title: "Error al iniciar conexión", variant: "destructive" });
-      setConnecting(false);
+      toast({ title: "Error al registrar dispositivo", variant: "destructive" });
     }
   };
 
-  const handleDisconnect = async () => {
+  const handleUnregister = async () => {
     try {
-      await whatsappApi.disconnect();
+      await whatsappApi.unregister();
       qc.invalidateQueries({ queryKey: ["whatsapp-status"] });
-      toast({ title: "WhatsApp desconectado" });
+      toast({ title: "WhatsApp desregistrado" });
     } catch {
-      toast({ title: "Error al desconectar", variant: "destructive" });
+      toast({ title: "Error al desregistrar", variant: "destructive" });
     }
   };
 
@@ -169,75 +152,55 @@ function WhatsAppPanel() {
             variant="outline"
             className={cn(
               "ml-auto text-xs",
-              status === "connected" && "border-green-500 text-green-500",
-              status === "qr_pending" && "border-amber-500 text-amber-500",
-              status === "disconnected" && "border-muted-foreground/50 text-muted-foreground"
+              registered && "border-green-500 text-green-500",
+              !registered && "border-muted-foreground/50 text-muted-foreground"
             )}
           >
-            {status === "connected" ? "Conectado" : status === "qr_pending" ? "Conectando…" : "Desconectado"}
+            {registered ? "Conectado" : "Desconectado"}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {status === "connected" ? (
-          /* ── Connected ── */
-          <div className="flex items-center justify-between">
+        {registered ? (
+          <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-green-500">
               <CheckCircle2 className="h-4 w-4" />
-              Listo para publicar estados
+              <span>Dispositivo: <strong>{data?.deviceName || displayPhone}</strong></span>
             </div>
-            <Button variant="outline" size="sm" onClick={handleDisconnect}>Desconectar</Button>
-          </div>
-
-        ) : pairingCode ? (
-          /* ── Pairing code received — waiting for user to enter it on phone ── */
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Abre WhatsApp en tu teléfono e ingresa este código:
+            <p className="text-xs text-muted-foreground">
+              Las publicaciones se enviaran al telefono via polling del endpoint /api/whatsapp/pending.
+              MacroDroid en el telefono debe consultar cada 60s y publicar via UI Automation.
             </p>
-            <div className="flex items-center gap-3">
-              <div className="font-mono text-2xl font-bold tracking-[0.3em] bg-muted px-5 py-3 rounded-lg select-all">
-                {pairingCode}
-              </div>
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">+{displayPhone}</span>
+              <Button variant="outline" size="sm" onClick={handleUnregister}>Desconectar</Button>
             </div>
-            <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
-              <li>Ajustes → Dispositivos vinculados</li>
-              <li>Toca <strong>Vincular con número de teléfono</strong></li>
-              <li>Ingresa el código de arriba</li>
-            </ol>
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive w-full" onClick={handleDisconnect}>
-              Cancelar
-            </Button>
           </div>
-
-        ) : connecting ? (
-          /* ── Waiting for code to arrive from server ── */
-          <div className="flex items-center gap-2 text-sm text-amber-500 py-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Solicitando código de emparejamiento…
-          </div>
-
         ) : (
-          /* ── Disconnected — show connect form ── */
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Ingresa el número de WhatsApp Business con código de país (sin +)
+              Registra el numero de WhatsApp Business del telefono que ejecutara la automatizacion.
             </p>
+            <Input
+              placeholder="Nombre del dispositivo (ej: Samsung A54)"
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+              className="font-mono"
+            />
             <div className="flex gap-2">
               <Input
                 placeholder="56912345678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="flex-1 font-mono"
-                onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()}
               />
-              <Button size="sm" onClick={handleConnect} disabled={!phone.trim()}>
+              <Button size="sm" onClick={handleRegister} disabled={!phone.trim()}>
                 Conectar
               </Button>
             </div>
             <p className="text-xs text-muted-foreground/60">
-              Requiere WhatsApp o WhatsApp Business con multidispositivo activado.
+              Requiere MacroDroid en el telefono con permisos de accesibilidad activados.
             </p>
           </div>
         )}
