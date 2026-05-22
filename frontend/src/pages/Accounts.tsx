@@ -259,6 +259,9 @@ export function Accounts() {
     } else if (connected === "linkedin") {
       toast({ title: "LinkedIn conectado ✓" });
       setSearchParams({}, { replace: true });
+    } else if (connected === "linkedin-pages") {
+      toast({ title: "Páginas de LinkedIn conectadas ✓" });
+      setSearchParams({}, { replace: true });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -290,6 +293,8 @@ export function Accounts() {
   const fb = accounts.filter((a) => a.platform === "facebook");
   const ig = accounts.filter((a) => a.platform === "instagram");
   const li = accounts.filter((a) => a.platform === "linkedin");
+  const liPersonal = li.filter((a) => !a.account_id.startsWith("urn:li:organization:"));
+  const liPages = li.filter((a) => a.account_id.startsWith("urn:li:organization:"));
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -325,15 +330,26 @@ export function Accounts() {
             onDelete={(id) => deleteMutation.mutate(id)}
           />
           <PlatformCard
-            label="LinkedIn"
+            label="LinkedIn (Perfil)"
             icon={Linkedin}
             color="text-[#0A66C2]"
             bg="bg-[#0A66C2]/10"
-            accounts={li}
+            accounts={liPersonal}
             onToggle={(id) => toggleMutation.mutate(id)}
             onDelete={(id) => deleteMutation.mutate(id)}
             onConnect={() => connectOAuth("linkedin")}
-            connectLabel={li.length > 0 ? "Reconectar LinkedIn" : "Conectar LinkedIn"}
+            connectLabel={liPersonal.length > 0 ? "Reconectar LinkedIn" : "Conectar LinkedIn"}
+          />
+          <PlatformCard
+            label="LinkedIn (Página de empresa)"
+            icon={Linkedin}
+            color="text-[#0A66C2]"
+            bg="bg-[#0A66C2]/10"
+            accounts={liPages}
+            onToggle={(id) => toggleMutation.mutate(id)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onConnect={() => connectOAuth("linkedin-pages")}
+            connectLabel={liPages.length > 0 ? "Reconectar páginas" : "Conectar página de empresa"}
           />
           <WhatsAppPanel />
         </div>

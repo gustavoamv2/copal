@@ -227,4 +227,124 @@ router.get("/linkedin/callback", async (req, res, next) => {
   }
 });
 
+// --- LinkedIn Pages (Community Management API) ---
+
+router.get("/linkedin-pages/connect", oauthAuth, (req: AuthRequest, res) => {
+  const state = Buffer.from(JSON.stringify({ userId: req.user!.sub })).toString("base64url");
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: config.LINKEDIN_PAGES_CLIENT_ID,
+    redirect_uri: config.LINKEDIN_PAGES_REDIRECT_URI,
+    scope: "openid profile w_organization_social",
+    state,
+  });
+  res.redirect(`https://www.linkedin.com/oauth/v2/authorization?${params}`);
+});
+
+router.get("/linkedin-pages/callback", async (req, res, next) => {
+  try {
+    const { code, state } = req.query as Record<string, string>;
+    if (!code || !state) throw createError("Missing code or state", 400);
+
+    const { userId } = JSON.parse(Buffer.from(state, "base64url").toString());
+
+    const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: config.LINKEDIN_PAGES_REDIRECT_URI,
+        client_id: config.LINKEDIN_PAGES_CLIENT_ID,
+        client_secret: config.LINKEDIN_PAGES_CLIENT_SECRET,
+      }),
+    });
+    const tokenData = (await tokenRes.json()) as {
+      access_token?: string;
+      expires_in?: number;
+    };
+    if (!tokenData.access_token) throw createError("Failed to get LinkedIn Pages token", 502);
+
+    const expiresAt = tokenData.expires_in
+      ? new Date(Date.now() + tokenData.expires_in * 1000)
+      : undefined;
+
+    const orgsRes = await fetch(
+      "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&state=APPROVED",
+      {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+      }
+    );
+
+    if (!orgsRes.ok) throw createError("Failed to fetch LinkedIn organizations", 502);
+
+    type OrgEntry = {
+      state: string;
+      role: string;
+      organizationTarget: string;
+      organizationalTarget: string;
+    };
+    const orgsData = (await orgsRes.json()) as { elements?: OrgEntry[] };
+
+    const orgs = (orgsData.elements ?? []).map((e) => {
+      const orgUrn = e.organizationTarget ?? e.organizationalTarget ?? "";
+      const orgId = orgUrn.split(":").pop() ?? orgUrn;
+      return { urn: orgUrn, id: orgId };
+    });
+
+    if (!orgs.length) throw createError("No LinkedIn Pages found for this account", 400);
+
+    for (const org of orgs) {
+      const nameRes = await fetch(
+        `https://api.linkedin.com/v2/organizationsLookup?ids=${encodeURIComponent(org.id)}&projection=(id,localizedName)`,
+        {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            "X-Restli-Protocol-Version": "2.0.0",
+            "LinkedIn-Version": "202305",
+          },
+        }
+      );
+      let pageName = org.id;
+      if (nameRes.ok) {
+        const nameData = (await nameRes.json()) as {
+          results?: Record<string, { localizedName?: string }>;
+        };
+        const info = nameData.results?.[org.id];
+        if (info?.localizedName) pageName = info.localizedName;
+      }
+
+      const stored = await prisma.socialAccount.findFirst({
+        where: { user_id: userId, platform: "linkedin", account_id: org.urn },
+      });
+
+      if (stored) {
+        await prisma.socialAccount.update({
+          where: { id: stored.id },
+          data: { access_token_enc: encrypt(tokenData.access_token), token_expires_at: expiresAt, is_active: true, account_name: pageName },
+        });
+      } else {
+        await prisma.socialAccount.create({
+          data: {
+            user_id: userId,
+            platform: "linkedin",
+            account_name: pageName,
+            account_id: org.urn,
+            access_token_enc: encrypt(tokenData.access_token),
+            token_expires_at: expiresAt,
+            is_active: true,
+          },
+        });
+      }
+    }
+
+    res.redirect(`${config.FRONTEND_URL}/accounts?connected=linkedin-pages`);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
