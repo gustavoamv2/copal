@@ -58,9 +58,8 @@ class NativeSocialService {
             where: { id: specificId, user_id: userId, is_active: true },
           });
         } else if (platform === 'linkedin') {
-          // Solo páginas de empresa — las cuentas personales no se usan
           account = await prisma.socialAccount.findFirst({
-            where: { user_id: userId, platform, is_active: true, account_id: { startsWith: 'urn:li:organization:' } },
+            where: { user_id: userId, platform, is_active: true },
           });
         } else {
           account = await prisma.socialAccount.findFirst({

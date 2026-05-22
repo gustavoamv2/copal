@@ -241,7 +241,6 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
         const account = await prisma.socialAccount.findFirst({
           where: {
             user_id: userId, platform, is_active: true,
-            ...(platform === "linkedin" ? { account_id: { startsWith: "urn:li:organization:" } } : {}),
           },
         });
         if (!account) { errors.push(`${platform}: sin cuenta activa`); continue; }
