@@ -68,7 +68,7 @@ router.get("/:id", async (req: AuthRequest, res, next) => {
     const post = await prisma.post.findFirst({
       where: { id: req.params.id, user_id: req.user!.sub },
       include: {
-        variants: { include: { social_account: { select: { id: true, account_name: true, platform: true } } } },
+        variants: { include: { social_account: { select: { id: true, account_name: true, platform: true, account_id: true } } } },
         post_media: { include: { media_asset: true }, orderBy: { order_index: "asc" } },
         scheduled_pubs: true,
       },

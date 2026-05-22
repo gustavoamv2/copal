@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   X, Check, Heart, MessageCircle, Send,
   Bookmark, ThumbsUp, Share2, MoreHorizontal, ChevronLeft,
@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { postsApi } from "@/api/posts";
-import { accountsApi } from "@/api/accounts";
 import { toast } from "@/hooks/useToast";
 import type { Post, Platform } from "@/types";
 
@@ -333,16 +332,6 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<ViewMode>("preview");
 
-  // Accounts — needed to resolve the LinkedIn org ID for the copy+open URL
-  const { data: accountsData } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: () => accountsApi.list().then((r) => r.data),
-  });
-  const linkedInOrgAccount = (accountsData ?? []).find(
-    (a) => a.platform === "linkedin" && a.is_active && a.account_id.startsWith("urn:li:organization:")
-  );
-  const linkedInOrgId = linkedInOrgAccount?.account_id.replace("urn:li:organization:", "");
-
   const platforms    = post.variants.map((v) => v.platform as Platform);
   const unique       = Array.from(new Set(platforms));
   const tabs: NetworkTab[] = unique.length > 0 ? unique : ["generic"];
@@ -379,6 +368,10 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   // LinkedIn posts use copy+open flow — they cannot be auto-published via API
   const isLinkedIn = post.variants.some((v) => v.platform === "linkedin") ||
     titleLower.includes("linkedin");
+  // LinkedIn personal profile posts CAN be auto-published; org pages cannot
+  const isLinkedInOrg = post.variants.some(
+    (v) => v.platform === "linkedin" && v.social_account?.account_id?.startsWith("urn:li:organization:")
+  );
 
   // Edit state
   const [title,       setTitle]       = useState(post.title);
@@ -411,50 +404,6 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   });
 
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  // ── LinkedIn copy+open helpers ──────────────────────────────────────────────
-  const downloadImages = async (assets: Array<{ storage_url: string; filename: string }>) => {
-    for (const asset of assets) {
-      try {
-        const res = await fetch(asset.storage_url);
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = blobUrl;
-        anchor.download = asset.filename || "imagen-linkedin.jpg";
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(blobUrl);
-      } catch {
-        window.open(asset.storage_url, "_blank");
-      }
-    }
-  };
-
-  const handleLinkedInCopyOpen = async () => {
-    const liVariant = post.variants.find((v) => v.platform === "linkedin");
-    const liCaption = liVariant?.caption ?? post.base_caption;
-    const mediaAssets = (post.post_media ?? [])
-      .map((pm) => pm.media_asset)
-      .filter((a): a is NonNullable<typeof a> => Boolean(a)) as Array<{ storage_url: string; filename: string }>;
-
-    try { await navigator.clipboard.writeText(liCaption); } catch {}
-
-    if (mediaAssets.length > 0) {
-      await downloadImages(mediaAssets);
-    }
-
-    const url = linkedInOrgId
-      ? `https://www.linkedin.com/company/${linkedInOrgId}/admin/page-posts/new/`
-      : "https://www.linkedin.com/feed/";
-    window.open(url, "_blank");
-
-    const imgMsg = mediaAssets.length > 0
-      ? ` · ${mediaAssets.length} imagen${mediaAssets.length > 1 ? "es descargadas" : " descargada"}`
-      : "";
-    toast({ title: `Caption copiado${imgMsg} ✓ — pega el texto y sube la imagen en LinkedIn` });
-  };
 
   // Publish now — direct API (no Ayrshare, no watermark)
   const [publishing, setPublishing] = useState(false);
@@ -657,7 +606,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                   </Button>
                   <Button size="sm" variant="outline" onClick={handleReprogramar} className="gap-1.5">
                     <ExternalLink className="h-3.5 w-3.5" />
-                    {isLinkedIn ? "Pendiente Manual" : "Reprogramar/Editar"}
+                    {isLinkedInOrg ? "Pendiente Manual" : "Reprogramar/Editar"}
                   </Button>
                   {isPublished ? (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600/15 text-green-500 text-sm font-medium border border-green-600/25">
@@ -666,27 +615,13 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                     </div>
                   ) : (
                     <>
-                      {/* LinkedIn manual copy+open — only shown for LinkedIn posts */}
-                      {isLinkedIn && (
-                        <Button
-                          size="sm"
-                          className="gap-1.5 bg-[#0A66C2] hover:bg-[#004182] text-white whitespace-nowrap"
-                          onClick={async () => {
-                            try { await handleLinkedInCopyOpen(); }
-                            catch { toast({ title: "Error al abrir LinkedIn", variant: "destructive" }); }
-                          }}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" /> Copiar y abrir LinkedIn
-                        </Button>
-                      )}
-
-                      {/* Publish now — disabled for LinkedIn, active for everything else */}
+                      {/* Publish now — enabled for personal LinkedIn, disabled for org LinkedIn */}
                       <Button
                         size="sm"
                         className="gap-1.5 bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
                         onClick={handlePublish}
-                        disabled={publishing || isLinkedIn}
-                        title={isLinkedIn ? "LinkedIn no admite publicación directa — usa el botón azul" : undefined}
+                        disabled={publishing || isLinkedInOrg}
+                        title={isLinkedInOrg ? "LinkedIn Empresa no admite publicación directa" : undefined}
                       >
                         {publishing
                           ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publicando…</>

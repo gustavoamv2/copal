@@ -43,7 +43,7 @@ export interface PostVariant {
   platform_post_id: string | null;
   published_at: string | null;
   error_message: string | null;
-  social_account?: Pick<SocialAccount, "id" | "account_name" | "platform">;
+  social_account?: Pick<SocialAccount, "id" | "account_name" | "platform" | "account_id">;
 }
 
 export interface PostMedia {
