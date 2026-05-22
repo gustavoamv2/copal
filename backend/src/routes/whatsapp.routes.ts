@@ -16,6 +16,7 @@ router.get("/status", requireAuth, async (req: AuthRequest, res: Response) => {
     registered: !!account,
     deviceName: account?.account_name ?? null,
     phoneNumber: account?.account_id ?? null,
+    userId: req.user!.sub,
   });
 });
 
