@@ -5,6 +5,12 @@
       "use": "@vercel/node"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/cron/scheduled",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "routes": [
     {
       "src": "/api/cron/(.*)",

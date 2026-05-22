@@ -49,6 +49,7 @@ export function NewPost() {
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>(prefill?.media ?? []);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["linkedin"]);
+  const [showLinkedInPages, setShowLinkedInPages] = useState(false);
   const [instagramType, setInstagramType] = useState<InstagramPostType>(prefill?.instagramType ?? "feed");
   const [facebookType, setFacebookType] = useState<FacebookPostType>(prefill?.facebookType ?? "post");
   const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<SocialPlatform, string>>>({});
@@ -62,20 +63,14 @@ export function NewPost() {
 
   const accountsForPlatform = (p: SocialPlatform) => {
     const accs = allAccounts.filter((a) => a.platform === p && a.is_active);
-    // LinkedIn: solo páginas de empresa (urn:li:organization:)
-    if (p === "linkedin") return accs.filter((a) => a.account_id.startsWith("urn:li:organization:"));
+    if (p === "linkedin") return accs.filter((a) => !a.account_id.startsWith("urn:li:organization:"));
     return accs;
   };
 
-  // Cuenta de empresa LinkedIn activa (siempre es org por el filtro anterior)
-  const linkedInActiveAccount = (() => {
-    if (!ayrPlatforms.includes("linkedin")) return null;
-    const accs = accountsForPlatform("linkedin");
-    const selectedId = selectedAccounts["linkedin"];
-    if (selectedId) return accs.find((a) => a.id === selectedId) ?? accs[0] ?? null;
-    return accs[0] ?? null;
-  })();
-  const linkedInOrgId = linkedInActiveAccount?.account_id.replace("urn:li:organization:", "");
+  const linkedinOrgAccounts = allAccounts.filter(
+    (a) => a.platform === "linkedin" && a.account_id.startsWith("urn:li:organization:") && a.is_active
+  );
+  const linkedInOrgId = linkedinOrgAccounts[0]?.account_id.replace("urn:li:organization:", "") ?? null;
 
   const downloadImages = async (assets: Array<{ storage_url: string; filename: string }>) => {
     for (const asset of assets) {
@@ -153,12 +148,6 @@ export function NewPost() {
 
   const handlePublish = async (immediate: boolean) => {
     if (!baseCaption || ayrPlatforms.length === 0) return;
-    // LinkedIn siempre se publica manualmente — excluir del auto-publish
-    const autoPlatforms = ayrPlatforms.filter((p) => p !== "linkedin");
-    if (autoPlatforms.length === 0) {
-      toast({ title: "Usa el botón de LinkedIn para copiar y publicar manualmente", variant: "destructive" });
-      return;
-    }
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
     const scheduledIso = immediate ? undefined : (scheduledAt ? new Date(scheduledAt).toISOString() : undefined);
 
@@ -167,18 +156,18 @@ export function NewPost() {
       return;
     }
 
-    if (autoPlatforms.includes("instagram") && mediaUrls.length === 0) {
+    if (ayrPlatforms.includes("instagram") && mediaUrls.length === 0) {
       toast({ title: "Instagram requiere al menos una imagen", variant: "destructive" });
       return;
     }
 
     const accounts = Object.fromEntries(
-      Object.entries(selectedAccounts).filter(([p]) => (autoPlatforms as string[]).includes(p))
+      Object.entries(selectedAccounts).filter(([p]) => (ayrPlatforms as string[]).includes(p))
     ) as Partial<Record<SocialPlatform, string>>;
 
     const mediaIds = selectedMedia.map((m) => m.id);
 
-    const res = await publish({ content: baseCaption, platforms: autoPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, facebookType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
+    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType, facebookType, accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
     if (res.success) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
@@ -325,7 +314,7 @@ export function NewPost() {
             {([
               { id: "facebook",  label: "Facebook" },
               { id: "instagram", label: "Instagram" },
-              { id: "linkedin",  label: "LinkedIn" },
+              { id: "linkedin",  label: "LinkedIn (Perfil)" },
             ] as { id: SocialPlatform; label: string }[]).map(({ id, label }) => {
               const accs = accountsForPlatform(id);
               const isOn = ayrPlatforms.includes(id);
@@ -374,6 +363,29 @@ export function NewPost() {
                 </div>
               );
             })}
+            {/* LinkedIn Empresa (manual / pendiente aprobación) */}
+            <div key="linkedin-pages" className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowLinkedInPages(!showLinkedInPages)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  showLinkedInPages
+                    ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                }`}
+              >
+                LinkedIn (Empresa)
+              </button>
+              {linkedinOrgAccounts.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {linkedinOrgAccounts.length} página{linkedinOrgAccounts.length !== 1 ? "s" : ""} conectada{linkedinOrgAccounts.length !== 1 ? "s" : ""}
+                </span>
+              )}
+              {linkedinOrgAccounts.length === 0 && (
+                <span className="text-xs text-muted-foreground/60">Conecta en Cuentas cuando se apruebe el acceso</span>
+              )}
+            </div>
+
             <button
               type="button"
               disabled
@@ -439,7 +451,7 @@ export function NewPost() {
             </div>
           )}
           {/* Flujo manual para LinkedIn empresa */}
-          {ayrPlatforms.includes("linkedin") && (
+          {showLinkedInPages && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-3 space-y-2">
               <p className="text-xs text-amber-400 font-medium">
                 ⚠️ LinkedIn no permite publicar en páginas de empresa vía API sin aprobación especial.
