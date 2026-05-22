@@ -1,6 +1,6 @@
 import { mediaApi } from "@/api/media";
 import { postsApi } from "@/api/posts";
-import { socialApi, SocialPlatform } from "@/api/social";
+import { SocialAccount, Platform } from "@/types";
 import {
   RawPublication,
   ValidationResult,
@@ -123,8 +123,8 @@ export function mapNetworks(
 export function mapPlatforms(
   networks: ImportNetwork[],
   instagramType: string
-): { platforms: SocialPlatform[]; instagramType: string } {
-  const platforms: SocialPlatform[] = networks.map((n) => {
+): { platforms: Platform[]; instagramType: string } {
+  const platforms: Platform[] = networks.map((n) => {
     switch (n) {
       case "LinkedIn":
         return "linkedin";
@@ -227,11 +227,11 @@ async function fetchImageAsFile(url: string): Promise<File | null> {
 // ---------------------------------------------------------------------------
 export async function importPublication(
   pub: ImportedPublication,
-  mode: ImportMode
+  mode: ImportMode,
+  activeAccounts: SocialAccount[] = []
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const mediaIds: string[] = [];
-    const mediaStorageUrls: string[] = [];
 
     // Determine which files to upload.
     // Priority: user-selected files → URL paths in JSON → nothing
@@ -251,9 +251,9 @@ export async function importPublication(
 
     // Upload all image files (carousel support)
     for (const file of filesToUpload) {
+      console.log(`[import] uploading media: ${file.name}`);
       const res = await mediaApi.upload(file);
       mediaIds.push(res.data.id);
-      mediaStorageUrls.push(res.data.storage_url);
     }
 
     // If the scheduled date is in the past, fall back to draft
@@ -269,35 +269,36 @@ export async function importPublication(
       (pub.networks.length > 0 ? pub.networks.join(" / ") : null);
     const titleForCalendar = tipoLabel ? `${tipoLabel} · ${pub.title}` : pub.title;
 
+    // Build variants for auto-platforms (facebook, instagram).
+    // LinkedIn is intentionally excluded — those posts remain as manual pending.
+    const variants: { social_account_id: string; platform: "instagram" | "facebook" | "linkedin"; caption: string }[] = [];
+    if (effectiveMode === "scheduled") {
+      const { platforms } = mapPlatforms(pub.networks, pub.instagramType);
+      for (const platform of platforms) {
+        if (platform === "linkedin") continue;
+        const account = activeAccounts.find((a) => a.platform === platform && a.is_active);
+        if (account) {
+          variants.push({ social_account_id: account.id, platform, caption: pub.caption });
+        }
+      }
+    }
+
+    console.log(`[import] creating post: ${pub.raw.id} | mode=${effectiveMode} | variants=${variants.length} | media=${mediaIds.length}`);
     await postsApi.create({
       title: titleForCalendar,
       base_caption: pub.caption,
       status: effectiveMode === "draft" ? "draft" : "scheduled",
       scheduled_at: scheduledDate ? scheduledDate.toISOString() : null,
-      variants: [],
+      variants,
       media_ids: mediaIds,
     });
 
-    if (effectiveMode === "scheduled") {
-      const { platforms, instagramType } = mapPlatforms(pub.networks, pub.instagramType);
-      // LinkedIn company pages no se pueden auto-publicar vía API sin aprobación especial.
-      // Los posts de LinkedIn se guardan en BD con fecha y aparecen en "Pendiente manual".
-      const autoPlatforms = platforms.filter((p) => p !== "linkedin");
-      if (autoPlatforms.length > 0) {
-        await socialApi.schedule({
-          content: pub.caption,
-          platforms: autoPlatforms,
-          instagramType: instagramType as "feed" | "story" | "carousel" | "reel",
-          mediaUrls: mediaStorageUrls,
-          scheduledAt: scheduledDate!.toISOString(),
-        });
-      }
-    }
-
     return { success: true };
   } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
     const message =
-      err instanceof Error ? err.message : "Error desconocido al importar";
+      axiosError?.response?.data?.error ??
+      (err instanceof Error ? err.message : "Error desconocido al importar");
     return { success: false, error: message };
   }
 }

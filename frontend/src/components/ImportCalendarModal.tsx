@@ -36,6 +36,8 @@ import {
   ImportReport,
   ImportResult,
 } from "@/types/import";
+import { accountsApi } from "@/api/accounts";
+import { SocialAccount } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -872,15 +874,23 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
 
     const results: ImportResult[] = [];
 
+    let activeAccounts: SocialAccount[] = [];
+    try {
+      const res = await accountsApi.list();
+      activeAccounts = res.data.filter((a) => a.is_active);
+    } catch {
+      // continue without accounts — variants won't be created for auto-platforms
+    }
+
     for (let i = 0; i < selected.length; i++) {
       if (cancelRef.current) break;
       setProgress(i + 1);
 
       const pub = selected[i];
       // Siempre importar como "scheduled":
-      // - Facebook e Instagram se programan automáticamente
+      // - Facebook e Instagram se programan automáticamente via variants
       // - LinkedIn queda en "Pendiente manual"
-      const { success, error } = await importPublication(pub, "scheduled");
+      const { success, error } = await importPublication(pub, "scheduled", activeAccounts);
       results.push({
         id: pub.raw.id,
         title: pub.title,

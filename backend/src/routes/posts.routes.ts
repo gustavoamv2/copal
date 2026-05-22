@@ -116,7 +116,11 @@ router.post("/", async (req: AuthRequest, res, next) => {
 
     if (post.status === "scheduled" && post.scheduled_at) {
       for (const variant of post.variants) {
-        await schedulePublication(post.id, variant.id, variant.social_account_id, post.scheduled_at);
+        try {
+          await schedulePublication(post.id, variant.id, variant.social_account_id, post.scheduled_at);
+        } catch (schedErr) {
+          console.error(`[posts] schedulePublication failed for variant ${variant.id}:`, schedErr);
+        }
       }
     }
 
@@ -149,7 +153,11 @@ router.put("/:id", async (req: AuthRequest, res, next) => {
 
     if (post.status === "scheduled" && post.scheduled_at) {
       for (const variant of post.variants) {
-        await schedulePublication(post.id, variant.id, variant.social_account_id, post.scheduled_at);
+        try {
+          await schedulePublication(post.id, variant.id, variant.social_account_id, post.scheduled_at);
+        } catch (schedErr) {
+          console.error(`[posts] schedulePublication failed for variant ${variant.id}:`, schedErr);
+        }
       }
     }
 
