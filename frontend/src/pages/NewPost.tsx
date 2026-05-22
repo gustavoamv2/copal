@@ -50,6 +50,7 @@ export function NewPost() {
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["linkedin"]);
   const [showLinkedInPages, setShowLinkedInPages] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [instagramType, setInstagramType] = useState<InstagramPostType>(prefill?.instagramType ?? "feed");
   const [facebookType, setFacebookType] = useState<FacebookPostType>(prefill?.facebookType ?? "post");
   const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<SocialPlatform, string>>>({});
@@ -112,6 +113,23 @@ export function NewPost() {
       ? ` · ${selectedMedia.length} imagen${selectedMedia.length > 1 ? "es descargadas" : " descargada"}`
       : "";
     toast({ title: `Caption copiado${imgMsg} ✓ — pega el texto y sube la imagen en LinkedIn` });
+  };
+
+  const copyAndOpenWhatsApp = async () => {
+    try {
+      await navigator.clipboard.writeText(baseCaption);
+    } catch {}
+
+    if (selectedMedia.length > 0) {
+      await downloadImages(selectedMedia.map((m) => ({ storage_url: m.storage_url, filename: m.filename })));
+    }
+
+    window.open("https://web.whatsapp.com/", "_blank");
+
+    const imgMsg = selectedMedia.length > 0
+      ? ` · ${selectedMedia.length} imagen${selectedMedia.length > 1 ? "es descargadas" : " descargada"}`
+      : "";
+    toast({ title: `Caption copiado${imgMsg} ✓ — en WhatsApp Web ve a Estados (ícono de cámara) y pega el texto + sube la imagen` });
   };
 
   const toggleAyrPlatform = (p: SocialPlatform) => {
@@ -386,14 +404,19 @@ export function NewPost() {
               )}
             </div>
 
-            <button
-              type="button"
-              disabled
-              title="Próximamente"
-              className="px-3 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground opacity-40 cursor-not-allowed"
-            >
-              WhatsApp · Próximamente
-            </button>
+            <div key="whatsapp" className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowWhatsApp(!showWhatsApp)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  showWhatsApp
+                    ? "bg-[#25D366]/20 text-[#25D366] border-[#25D366]/40"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                }`}
+              >
+                WhatsApp
+              </button>
+            </div>
           </div>
 
           {/* Tipo de contenido Instagram */}
@@ -466,6 +489,27 @@ export function NewPost() {
                 onClick={copyAndOpenLinkedIn}
               >
                 📋 Copiar caption{selectedMedia.length > 0 ? ` + descargar imagen${selectedMedia.length > 1 ? "es" : ""}` : ""} y abrir LinkedIn
+              </Button>
+            </div>
+          )}
+
+          {/* Flujo manual para WhatsApp Status */}
+          {showWhatsApp && (
+            <div className="rounded-lg border border-[#25D366]/30 bg-[#25D366]/8 p-3 space-y-2">
+              <p className="text-xs text-[#25D366] font-medium">
+                Estados de WhatsApp
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Copia el caption y descarga la imagen. Luego en WhatsApp Web ve a la pestaña <strong>Estados</strong> (ícono de cámara), pega el texto y sube la imagen.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                disabled={!baseCaption}
+                onClick={copyAndOpenWhatsApp}
+              >
+                {selectedMedia.length > 0 ? "🖼 " : "📋 "}
+                Copiar caption{selectedMedia.length > 0 ? ` + descargar imagen${selectedMedia.length > 1 ? "es" : ""}` : ""} y abrir WhatsApp Web
               </Button>
             </div>
           )}
