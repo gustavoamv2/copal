@@ -965,17 +965,17 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
           <span className="text-base">💼</span>
           <div>
             <p className="font-medium text-foreground">LinkedIn</p>
-            <p className="text-xs text-muted-foreground">Se guarda con fecha pero requiere publicación manual desde la pestaña "Pendiente manual"</p>
+            <p className="text-xs text-muted-foreground">Se programa automaticamente segun la fecha del calendario</p>
           </div>
-          <span className="ml-auto text-xs font-medium text-amber-400 shrink-0">Manual</span>
+          <span className="ml-auto text-xs font-medium text-green-500 shrink-0">Auto</span>
         </div>
         <div className="flex items-center gap-3 px-4 py-3">
           <span className="text-base">💬</span>
           <div>
             <p className="font-medium text-foreground">WhatsApp</p>
-            <p className="text-xs text-muted-foreground">Se guarda con fecha pero requiere publicación manual desde la pestaña "Pendiente manual"</p>
+            <p className="text-xs text-muted-foreground">Se publica automaticamente via el telefono (MacroDroid consulta cada 60s)</p>
           </div>
-          <span className="ml-auto text-xs font-medium text-amber-400 shrink-0">Manual</span>
+          <span className="ml-auto text-xs font-medium text-green-500 shrink-0">Auto</span>
         </div>
       </div>
 
