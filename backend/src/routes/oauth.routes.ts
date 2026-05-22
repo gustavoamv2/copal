@@ -33,7 +33,9 @@ router.get("/meta/connect", oauthAuth, (req: AuthRequest, res) => {
     response_type: "code",
     state,
   });
-  res.redirect(`https://www.facebook.com/v19.0/dialog/oauth?${params}`);
+  const redirectUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params}`;
+  console.log("[OAUTH] Full redirect URL:", redirectUrl);
+  res.redirect(redirectUrl);
 });
 
 router.get("/meta/callback", async (req, res, next) => {
@@ -56,12 +58,25 @@ router.get("/meta/callback", async (req, res, next) => {
     const tokenData = (await tokenRes.json()) as { access_token?: string; error?: unknown };
     if (!tokenData.access_token) throw createError("Failed to get Meta token", 502);
 
+    // Exchange short-lived user token for long-lived (~60 days) so page tokens are also long-lived
+    const longLivedRes = await fetch(
+      "https://graph.facebook.com/v19.0/oauth/access_token?" +
+        new URLSearchParams({
+          grant_type: "fb_exchange_token",
+          client_id: config.META_APP_ID,
+          client_secret: config.META_APP_SECRET,
+          fb_exchange_token: tokenData.access_token,
+        })
+    );
+    const longLivedData = (await longLivedRes.json()) as { access_token?: string };
+    const userToken = longLivedData.access_token ?? tokenData.access_token;
+
     // Fetch pages — try direct access first, then Business Manager
     type PageEntry = { id: string; name: string; access_token: string };
     let pages: PageEntry[] = [];
 
     const pagesRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${tokenData.access_token}`
+      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${userToken}`
     );
     const pagesData = (await pagesRes.json()) as { data?: PageEntry[] };
     pages = pagesData.data ?? [];
@@ -69,12 +84,12 @@ router.get("/meta/callback", async (req, res, next) => {
     // Fallback: Business Manager owned pages
     if (pages.length === 0) {
       const bizRes = await fetch(
-        `https://graph.facebook.com/v19.0/me/businesses?access_token=${tokenData.access_token}`
+        `https://graph.facebook.com/v19.0/me/businesses?access_token=${userToken}`
       );
       const bizData = (await bizRes.json()) as { data?: Array<{ id: string }> };
       for (const biz of bizData.data ?? []) {
         const bizPagesRes = await fetch(
-          `https://graph.facebook.com/v19.0/${biz.id}/owned_pages?fields=id,name,access_token&access_token=${tokenData.access_token}`
+          `https://graph.facebook.com/v19.0/${biz.id}/owned_pages?fields=id,name,access_token&access_token=${userToken}`
         );
         const bizPages = (await bizPagesRes.json()) as { data?: PageEntry[] };
         pages = pages.concat(bizPages.data ?? []);

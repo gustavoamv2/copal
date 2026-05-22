@@ -1,4 +1,19 @@
 import { z } from "zod";
+import { config as dotenvConfig } from "dotenv";
+import { resolve } from "path";
+import { readFileSync, existsSync } from "fs";
+
+const envPath = resolve(process.cwd(), ".env");
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, "utf-8");
+  console.log("[config] Loading .env from:", envPath);
+  console.log("[config] First 200 chars:", envContent.slice(0, 200));
+  const result = dotenvConfig({ path: envPath });
+  console.log("[config] dotenv loaded:", result.parsed ? Object.keys(result.parsed).length + " keys" : "null");
+  console.log("[config] META_APP_ID after load:", process.env.META_APP_ID);
+} else {
+  console.log("[config] .env NOT FOUND at:", envPath);
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
