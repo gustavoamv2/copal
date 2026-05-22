@@ -139,6 +139,28 @@ export function NewPost() {
     }
   };
 
+  // Platforms compatible with current type selection
+  const platformCompatible = (p: SocialPlatform) => {
+    if (p === "linkedin") return instagramType === "feed" && facebookType !== "reel";
+    if (p === "facebook") return instagramType !== "carousel" && instagramType !== "story";
+    if (p === "instagram") return true;
+    return true;
+  };
+
+  // When instagramType changes, prune incompatible platforms
+  const setInstagramTypeSafe = (t: InstagramPostType) => {
+    setInstagramType(t);
+    if (t === "carousel" || t === "story") {
+      setAyrPlatforms((prev) => prev.filter((p) => p === "instagram"));
+    }
+  };
+  const setFacebookTypeSafe = (t: FacebookPostType) => {
+    setFacebookType(t);
+    if (t === "reel") {
+      setAyrPlatforms((prev) => prev.filter((p) => p !== "linkedin"));
+    }
+  };
+
   const { data: media } = useQuery({
     queryKey: ["media", { limit: 30 }],
     queryFn: () => mediaApi.list({ limit: 30 }).then((r) => r.data),
@@ -336,15 +358,20 @@ export function NewPost() {
             ] as { id: SocialPlatform; label: string }[]).map(({ id, label }) => {
               const accs = accountsForPlatform(id);
               const isOn = ayrPlatforms.includes(id);
+              const compatible = platformCompatible(id);
+              const canToggle = compatible || isOn;
               return (
                 <div key={id} className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => toggleAyrPlatform(id)}
+                    onClick={() => canToggle && toggleAyrPlatform(id)}
+                    disabled={!canToggle}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      isOn
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                      !compatible && !isOn
+                        ? "opacity-30 cursor-not-allowed border-border text-muted-foreground"
+                        : isOn
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/50"
                     }`}
                   >
                     {label}
@@ -433,7 +460,7 @@ export function NewPost() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setInstagramType(id)}
+                    onClick={() => setInstagramTypeSafe(id)}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                       instagramType === id
                         ? "bg-primary text-primary-foreground border-primary"
@@ -455,12 +482,11 @@ export function NewPost() {
                 {([
                   { id: "post",  label: "Publicación" },
                   { id: "reel",  label: "Reel" },
-                  { id: "story", label: "Historia" },
                 ] as { id: FacebookPostType; label: string }[]).map(({ id, label }) => (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setFacebookType(id)}
+                    onClick={() => setFacebookTypeSafe(id)}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                       facebookType === id
                         ? "bg-primary text-primary-foreground border-primary"
