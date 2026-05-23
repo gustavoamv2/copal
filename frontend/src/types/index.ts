@@ -1,4 +1,4 @@
-export type Platform = "instagram" | "facebook" | "linkedin";
+export type Platform = "instagram" | "facebook" | "linkedin" | "whatsapp";
 export type PostStatus = "draft" | "pending" | "approved" | "scheduled" | "published" | "failed";
 export type PublicationStatus = "pending" | "processing" | "published" | "failed";
 export type UserRole = "admin" | "editor";

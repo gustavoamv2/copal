@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
 import { Platform } from "@/types";
-import { Instagram, Facebook, Linkedin } from "lucide-react";
+import { Instagram, Facebook, Linkedin, MessageCircle } from "lucide-react";
 
 const icons: Record<Platform, React.ElementType> = {
   instagram: Instagram,
   facebook: Facebook,
   linkedin: Linkedin,
+  whatsapp: MessageCircle,
 };
 
 interface Props {

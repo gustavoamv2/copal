@@ -464,10 +464,11 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     instagram: "bg-pink-600 text-white border-transparent",
     facebook:  "bg-blue-700 text-white border-transparent",
     linkedin:  "bg-blue-900 text-white border-transparent",
+    whatsapp:  "bg-green-600 text-white border-transparent",
     generic:   "bg-primary text-primary-foreground border-transparent",
   };
   const TAB_LABELS: Record<NetworkTab, string> = {
-    instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", generic: "Vista previa",
+    instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", whatsapp: "WhatsApp", generic: "Vista previa",
   };
 
   return (
