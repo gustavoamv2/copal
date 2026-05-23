@@ -550,14 +550,9 @@ export function NewPost() {
 
           {/* Flujo automático para WhatsApp Status */}
           {showWhatsApp && (
-            <div className="rounded-lg border border-[#25D366]/30 bg-[#25D366]/8 p-3 space-y-2">
-              <p className="text-xs text-[#25D366] font-medium">
-                Estados de WhatsApp
-              </p>
-              <p className="text-xs text-muted-foreground">
-                El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono.
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono.
+            </p>
           )}
 
           <div className="flex gap-2">
