@@ -240,12 +240,9 @@ export function NewPost() {
 
     // Publicar en otras plataformas via Ayrshare
     if (ayrPlatforms.length > 0) {
-      if (!immediate && mediaUrls.length === 0) {
-        toast({ title: "Debes adjuntar al menos una imagen para programar una publicación", variant: "destructive" });
-        return;
-      }
-      if (ayrPlatforms.includes("instagram") && mediaUrls.length === 0) {
-        toast({ title: "Instagram requiere al menos una imagen", variant: "destructive" });
+      if (mediaUrls.length === 0) {
+        const names = ayrPlatforms.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(", ");
+        toast({ title: `${names} requiere${ayrPlatforms.length > 1 ? "n" : ""} una imagen`, description: "Adjunta una imagen antes de publicar.", variant: "destructive" });
         return;
       }
       const accounts = Object.fromEntries(
@@ -532,6 +529,13 @@ export function NewPost() {
             </div>
           </div>
           </div>
+
+          {/* Aviso imagen requerida para plataformas Ayrshare */}
+          {ayrPlatforms.length > 0 && selectedMedia.length === 0 && (
+            <p className="text-xs text-amber-500">
+              ⚠️ {ayrPlatforms.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(", ")} requiere{ayrPlatforms.length > 1 ? "n" : ""} una imagen — adjunta una antes de publicar.
+            </p>
+          )}
 
           {/* Flujo manual para LinkedIn empresa */}
           {showLinkedInPages && (
