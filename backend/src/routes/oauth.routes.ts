@@ -56,6 +56,7 @@ router.get("/meta/callback", async (req, res, next) => {
         })
     );
     const tokenData = (await tokenRes.json()) as { access_token?: string; error?: unknown };
+    console.log("[OAUTH] Short-lived token obtained:", !!tokenData.access_token, "error:", tokenData.error);
     if (!tokenData.access_token) throw createError("Failed to get Meta token", 502);
 
     // Exchange short-lived user token for long-lived (~60 days) so page tokens are also long-lived
@@ -68,7 +69,8 @@ router.get("/meta/callback", async (req, res, next) => {
           fb_exchange_token: tokenData.access_token,
         })
     );
-    const longLivedData = (await longLivedRes.json()) as { access_token?: string };
+    const longLivedData = (await longLivedRes.json()) as { access_token?: string; error?: unknown };
+    console.log("[OAUTH] Long-lived token obtained:", !!longLivedData.access_token, "error:", longLivedData.error);
     const userToken = longLivedData.access_token ?? tokenData.access_token;
 
     // Fetch pages — try direct access first, then Business Manager
@@ -78,24 +80,29 @@ router.get("/meta/callback", async (req, res, next) => {
     const pagesRes = await fetch(
       `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token&access_token=${userToken}`
     );
-    const pagesData = (await pagesRes.json()) as { data?: PageEntry[] };
+    const pagesData = (await pagesRes.json()) as { data?: PageEntry[]; error?: unknown; paging?: unknown };
+    console.log("[OAUTH] me/accounts response:", JSON.stringify({ status: pagesRes.status, data_count: pagesData.data?.length ?? 0, error: pagesData.error, pages: pagesData.data?.map(p => ({ id: p.id, name: p.name })) }));
     pages = pagesData.data ?? [];
 
     // Fallback: Business Manager owned pages
     if (pages.length === 0) {
+      console.log("[OAUTH] No pages via me/accounts, trying Business Manager...");
       const bizRes = await fetch(
         `https://graph.facebook.com/v22.0/me/businesses?access_token=${userToken}`
       );
-      const bizData = (await bizRes.json()) as { data?: Array<{ id: string }> };
+      const bizData = (await bizRes.json()) as { data?: Array<{ id: string }>; error?: unknown };
+      console.log("[OAUTH] me/businesses response:", JSON.stringify({ status: bizRes.status, biz_count: bizData.data?.length ?? 0, error: bizData.error }));
       for (const biz of bizData.data ?? []) {
         const bizPagesRes = await fetch(
           `https://graph.facebook.com/v22.0/${biz.id}/owned_pages?fields=id,name,access_token&access_token=${userToken}`
         );
-        const bizPages = (await bizPagesRes.json()) as { data?: PageEntry[] };
+        const bizPages = (await bizPagesRes.json()) as { data?: PageEntry[]; error?: unknown };
+        console.log(`[OAUTH] biz ${biz.id} owned_pages:`, JSON.stringify({ count: bizPages.data?.length ?? 0, error: bizPages.error }));
         pages = pages.concat(bizPages.data ?? []);
       }
     }
 
+    console.log("[OAUTH] Total pages found:", pages.length, pages.map(p => p.name));
     if (!pages.length) throw createError("No pages found for this Meta account", 400);
 
     // Save each page and its linked Instagram account

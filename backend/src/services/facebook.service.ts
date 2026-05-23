@@ -5,6 +5,11 @@ export type FacebookPostType = "post" | "reel" | "story";
 
 const GRAPH_API_VERSION = "v22.0";
 
+function cdnTransform(url: string, transform: string): string {
+  if (!url.includes("res.cloudinary.com")) return url;
+  return url.replace(/(\/upload\/)/, `$1${transform}/`);
+}
+
 interface PublishResult {
   platform_post_id: string;
   api_response: unknown;
@@ -13,10 +18,11 @@ interface PublishResult {
 // ── Facebook Stories ──────────────────────────────────────────────────────────
 
 async function publishPhotoStory(token: string, pageId: string, imageUrl: string): Promise<string> {
+  const optimizedUrl = cdnTransform(imageUrl, "w_1080,h_1920,c_fill,f_jpg,q_85");
   const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/photo_stories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: imageUrl, access_token: token }),
+    body: JSON.stringify({ url: optimizedUrl, access_token: token }),
   });
   const data = (await res.json()) as { post_id?: string; id?: string; success?: boolean; error?: { message: string } };
   if (!res.ok) {
@@ -186,10 +192,11 @@ export async function publishToFacebook(
       });
       data = (await res.json()) as typeof data;
     } else {
+      const imageUrl = cdnTransform(asset.storage_url, "w_1200,c_limit,f_jpg,q_85");
       const photoRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: asset.storage_url, caption, no_story: false, access_token: token }),
+        body: JSON.stringify({ url: imageUrl, caption, access_token: token }),
       });
       const photoData = (await photoRes.json()) as { id?: string; post_id?: string; error?: { message: string } };
       console.log("[Facebook] /photos response:", JSON.stringify(photoData));
@@ -199,10 +206,11 @@ export async function publishToFacebook(
   } else {
     const photoIds: string[] = [];
     for (const asset of mediaAssets) {
+      const imageUrl = cdnTransform(asset.storage_url, "w_1200,c_limit,f_jpg,q_85");
       const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: asset.storage_url, published: false, access_token: token }),
+        body: JSON.stringify({ url: imageUrl, published: false, access_token: token }),
       });
       const photoData = (await res.json()) as { id?: string; error?: { message: string } };
       if (!photoData.id) throw new Error(photoData.error?.message ?? "Failed to upload photo");

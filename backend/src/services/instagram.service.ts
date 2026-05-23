@@ -16,40 +16,45 @@ function cdnTransform(url: string, transform: string): string {
 }
 
 
-async function waitForContainer(pageId: string, containerId: string, token: string, maxWaitMs = 90000): Promise<void> {
+// isVideo: images are ready instantly; videos/reels need polling
+async function waitForContainer(pageId: string, containerId: string, token: string, isVideo = false, maxWaitMs = 90000): Promise<void> {
+  // Images don't need polling — they're FINISHED immediately after creation
+  if (!isVideo) {
+    await new Promise((r) => setTimeout(r, 1500));
+    return;
+  }
+
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
+    // Only request status_code — the "status" field causes authorization errors in v22.0
     const res = await fetch(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/${containerId}?fields=status_code,status&access_token=${token}`
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${containerId}?fields=status_code&access_token=${token}`
     );
     const data = (await res.json()) as {
       status_code?: string;
-      status?: string;
-      error?: { message: string; type?: string; code?: number };
+      error?: { message: string; type?: string; code?: number; error_subcode?: number };
     };
 
-    // Fail fast on any API-level error
+    console.log(`[Instagram] container ${containerId} poll:`, JSON.stringify(data));
+
     if (data.error) {
       const code = data.error.code ?? "?";
       const msg  = data.error.message;
-      // Token expired / invalid
       if (code === 190 || msg.toLowerCase().includes("authenticate")) {
         throw new Error(`Token de Instagram expirado o inválido (${code}). Reconecta tu cuenta de Instagram en Ajustes.`);
       }
       throw new Error(`Instagram API error (${code}): ${msg}`);
     }
-
     if (data.status_code === "FINISHED") return;
     if (data.status_code === "ERROR") {
-      throw new Error(`Instagram rechazó el contenido: ${data.status ?? "error desconocido"}. Verifica formato y dimensiones de la imagen.`);
+      throw new Error("Instagram rechazó el contenido del video. Verifica formato y dimensiones.");
     }
     if (data.status_code === "EXPIRED") throw new Error("Instagram container expiró antes de publicar. Intenta de nuevo.");
-    if (data.status_code === "PUBLISHED") return; // already published (e.g. retry)
+    if (data.status_code === "PUBLISHED") return;
 
-    // IN_PROGRESS or any other state → keep waiting
     await new Promise((r) => setTimeout(r, 4000));
   }
-  throw new Error("Instagram tardó demasiado en procesar el contenido (>90s). Intenta con una imagen más pequeña.");
+  throw new Error("Instagram tardó demasiado en procesar el video (>90s). Intenta con un archivo más pequeño.");
 }
 
 export async function publishToInstagram(
@@ -81,7 +86,8 @@ export async function publishToInstagram(
     });
     const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] story container response:`, JSON.stringify(data));
-    if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create Instagram story container"}`);
+    if (data.error) throw new Error(`Instagram (${data.error.code ?? "?"}): ${data.error.message}`);
+    if (!data.id) throw new Error("Failed to create Instagram story container");
     containerId = data.id;
 
   } else if (instagramType === "carousel" || mediaAssets.length > 1) {
@@ -101,19 +107,21 @@ export async function publishToInstagram(
       });
       const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
       console.log(`[Instagram] carousel item response:`, JSON.stringify(data));
-      if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create carousel item"}`);
-      if (isVideo) await waitForContainer(pageId, data.id, token);
+      if (data.error) throw new Error(`Instagram (${data.error.code ?? "?"}): ${data.error.message}`);
+      if (!data.id) throw new Error("Failed to create carousel item");
+      if (isVideo) await waitForContainer(pageId, data.id, token, true);
       childIds.push(data.id);
     }
 
     const carouselRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ media_type: "CAROUSEL", children: childIds.join(","), caption, access_token: token }),
+      body: JSON.stringify({ media_type: "CAROUSEL", children: childIds, caption, access_token: token }),
     });
     const carouselData = (await carouselRes.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] carousel container response:`, JSON.stringify(carouselData));
-    if (!carouselData.id) throw new Error(carouselData.error?.message ?? "Failed to create carousel");
+    if (carouselData.error) throw new Error(`Instagram (${carouselData.error.code ?? "?"}): ${carouselData.error.message}`);
+    if (!carouselData.id) throw new Error("Failed to create carousel");
     containerId = carouselData.id;
 
   } else if (instagramType === "reel") {
@@ -126,7 +134,8 @@ export async function publishToInstagram(
     });
     const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] reel container response:`, JSON.stringify(data));
-    if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create Instagram Reel container"}`);
+    if (data.error) throw new Error(`Instagram (${data.error.code ?? "?"}): ${data.error.message}`);
+    if (!data.id) throw new Error("Failed to create Instagram Reel container");
     containerId = data.id;
 
   } else {
@@ -134,12 +143,14 @@ export async function publishToInstagram(
     const asset = mediaAssets[0];
     const isVideo = asset.file_type.startsWith("video/");
     const mediaUrl = isVideo ? asset.storage_url : cdnTransform(asset.storage_url, "w_1080,c_limit,f_jpg");
+    // Instagram deprecated regular feed videos — videos are published as Reels.
+    // For image feed posts, no media_type is needed (defaults to IMAGE).
     const body: Record<string, string> = {
       [isVideo ? "video_url" : "image_url"]: mediaUrl,
       caption,
       access_token: token,
+      ...(isVideo ? { media_type: "REELS" } : {}),
     };
-    if (isVideo) body.media_type = "REELS";
 
     const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
@@ -148,12 +159,15 @@ export async function publishToInstagram(
     });
     const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] feed container response:`, JSON.stringify(data));
-    if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create Instagram media container"}`);
+    if (data.error) throw new Error(`Instagram (${data.error.code ?? "?"}): ${data.error.message}`);
+    if (!data.id) throw new Error("Failed to create Instagram media container");
     containerId = data.id;
   }
 
-  // Wait for container to be FINISHED before publishing
-  await waitForContainer(pageId, containerId, token);
+  // Videos need polling; images are ready immediately
+  const mainAsset = mediaAssets[0];
+  const mainIsVideo = mainAsset.file_type.startsWith("video/");
+  await waitForContainer(pageId, containerId, token, mainIsVideo);
 
   // Publish container
   const publishRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media_publish`, {

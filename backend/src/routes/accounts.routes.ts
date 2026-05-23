@@ -3,6 +3,7 @@ import { prisma } from "../prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import { createError } from "../middleware/error.middleware";
 import { decrypt } from "../utils/crypto";
+import { config } from "../config";
 
 const router = Router();
 router.use(requireAuth);
@@ -50,8 +51,10 @@ router.get("/:id/debug-token", async (req: AuthRequest, res, next) => {
     if (!account) throw createError("Account not found", 404);
 
     const token = decrypt(account.access_token_enc);
+    // debug_token requires an App Access Token (not a user/page token) as access_token
+    const appToken = `${config.META_APP_ID}|${config.META_APP_SECRET}`;
     const debugRes = await fetch(
-      `https://graph.facebook.com/debug_token?input_token=${token}&access_token=${token}`
+      `https://graph.facebook.com/debug_token?input_token=${token}&access_token=${appToken}`
     );
     const debug = await debugRes.json();
     res.json({ platform: account.platform, account_id: account.account_id, debug });
