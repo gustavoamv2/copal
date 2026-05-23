@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { postsApi } from "@/api/posts";
+import { whatsappApi } from "@/api/whatsapp";
 import { toast } from "@/hooks/useToast";
 import type { Post, Platform } from "@/types";
 
@@ -373,6 +374,10 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     (v) => v.platform === "linkedin" && v.social_account?.account_id?.startsWith("urn:li:organization:")
   );
 
+  // WhatsApp posts are published via MacroDroid, not Ayrshare
+  const isWhatsApp = post.variants.some((v) => v.platform === "whatsapp") ||
+    titleLower.includes("whatsapp");
+
   // Edit state
   const [title,       setTitle]       = useState(post.title);
   const [caption,     setCaption]     = useState(post.base_caption);
@@ -411,11 +416,20 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      const res = await postsApi.publishNow(post.id);
-      if (res.data.warnings?.length) {
-        toast({ title: "Publicado con advertencias", description: res.data.warnings.join("\n") });
+      if (isWhatsApp) {
+        // WhatsApp: enqueue via MacroDroid, not Ayrshare
+        await whatsappApi.publishStatus(
+          post.base_caption,
+          imageUrls.length > 0 ? imageUrls : undefined,
+        );
+        toast({ title: "Enviado a MacroDroid", description: "El estado se publicará cuando se ejecute la Macro en tu teléfono." });
       } else {
-        toast({ title: "¡Publicado correctamente!" });
+        const res = await postsApi.publishNow(post.id);
+        if (res.data.warnings?.length) {
+          toast({ title: "Publicado con advertencias", description: res.data.warnings.join("\n") });
+        } else {
+          toast({ title: "¡Publicado correctamente!" });
+        }
       }
       // Refresh all dependent queries so dashboard metrics and cards update
       await qc.invalidateQueries({ queryKey: ["posts"] });
