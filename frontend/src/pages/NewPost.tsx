@@ -257,6 +257,7 @@ export function NewPost() {
 
     if (overallSuccess) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
+      navigate("/");
     } else {
       toast({ title: errorMsg ?? "Error al publicar", variant: "destructive" });
     }
