@@ -7,6 +7,7 @@ import { mediaApi } from "@/api/media";
 import { accountsApi } from "@/api/accounts";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
 import type { SocialPlatform, InstagramPostType, FacebookPostType } from "@/api/social";
+import { whatsappApi } from "@/api/whatsapp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -216,31 +217,48 @@ export function NewPost() {
   });
 
   const handlePublish = async (immediate: boolean) => {
-    if (!baseCaption || ayrPlatforms.length === 0) return;
+    if (!baseCaption || (ayrPlatforms.length === 0 && !showWhatsApp)) return;
     const mediaUrls = selectedMedia.map((m) => m.storage_url).filter(Boolean);
     const scheduledIso = immediate ? undefined : (scheduledAt ? new Date(scheduledAt).toISOString() : undefined);
 
-    if (!immediate && mediaUrls.length === 0) {
-      toast({ title: "Debes adjuntar al menos una imagen para programar una publicación", variant: "destructive" });
-      return;
+    let overallSuccess = true;
+    let errorMsg: string | undefined;
+
+    // Publicar en WhatsApp Status via MacroDroid
+    if (showWhatsApp) {
+      try {
+        await whatsappApi.publishStatus(baseCaption, mediaUrls.length > 0 ? mediaUrls : undefined, scheduledIso);
+      } catch {
+        overallSuccess = false;
+        errorMsg = "Error al enviar a WhatsApp";
+      }
     }
 
-    if (ayrPlatforms.includes("instagram") && mediaUrls.length === 0) {
-      toast({ title: "Instagram requiere al menos una imagen", variant: "destructive" });
-      return;
+    // Publicar en otras plataformas via Ayrshare
+    if (ayrPlatforms.length > 0) {
+      if (!immediate && mediaUrls.length === 0) {
+        toast({ title: "Debes adjuntar al menos una imagen para programar una publicación", variant: "destructive" });
+        return;
+      }
+      if (ayrPlatforms.includes("instagram") && mediaUrls.length === 0) {
+        toast({ title: "Instagram requiere al menos una imagen", variant: "destructive" });
+        return;
+      }
+      const accounts = Object.fromEntries(
+        Object.entries(selectedAccounts).filter(([p]) => (ayrPlatforms as string[]).includes(p))
+      ) as Partial<Record<SocialPlatform, string>>;
+      const mediaIds = selectedMedia.map((m) => m.id);
+      const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType: getInstagramType(), facebookType: getFacebookType(), accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
+      if (!res.success) {
+        overallSuccess = false;
+        errorMsg = res.error;
+      }
     }
 
-    const accounts = Object.fromEntries(
-      Object.entries(selectedAccounts).filter(([p]) => (ayrPlatforms as string[]).includes(p))
-    ) as Partial<Record<SocialPlatform, string>>;
-
-    const mediaIds = selectedMedia.map((m) => m.id);
-
-    const res = await publish({ content: baseCaption, platforms: ayrPlatforms, mediaUrls, mediaIds, scheduledAt: scheduledIso, instagramType: getInstagramType(), facebookType: getFacebookType(), accounts: Object.keys(accounts).length > 0 ? accounts : undefined });
-    if (res.success) {
+    if (overallSuccess) {
       toast({ title: scheduledIso ? "Post programado ✓" : "Publicado en redes sociales ✓" });
     } else {
-      toast({ title: res.error ?? "Error al publicar", variant: "destructive" });
+      toast({ title: errorMsg ?? "Error al publicar", variant: "destructive" });
     }
   };
 
@@ -555,14 +573,14 @@ export function NewPost() {
             <Button
               variant="outline"
               className="flex-1"
-              disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
+              disabled={!baseCaption || (ayrPlatforms.length === 0 && !showWhatsApp) || publishing}
               onClick={() => handlePublish(true)}
             >
               {publishing ? "Procesando..." : "Publicar ahora"}
             </Button>
             <Button
               className="flex-1"
-              disabled={!baseCaption || ayrPlatforms.length === 0 || publishing}
+              disabled={!baseCaption || (ayrPlatforms.length === 0 && !showWhatsApp) || publishing}
               onClick={() => handlePublish(false)}
             >
               {publishing ? "Procesando..." : "Programar publicación"}

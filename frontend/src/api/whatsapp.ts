@@ -11,6 +11,6 @@ export const whatsappApi = {
   register: (deviceName: string, phoneNumber: string) =>
     api.post("/whatsapp/register", { deviceName, phoneNumber }),
   unregister: () => api.delete("/whatsapp/register"),
-  publishStatus: (caption: string, mediaUrls?: string[]) =>
-    api.post("/whatsapp/status/publish", { caption, mediaUrls }),
+  publishStatus: (caption: string, mediaUrls?: string[], scheduledAt?: string) =>
+    api.post("/whatsapp/status/publish", { caption, mediaUrls, scheduledAt }),
 };

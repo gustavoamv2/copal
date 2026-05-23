@@ -69,7 +69,7 @@ router.put("/reschedule", async (req, res: Response) => {
 });
 
 router.post("/status/publish", requireAuth, async (req: AuthRequest, res: Response) => {
-  const { caption, mediaUrls } = req.body ?? {};
+  const { caption, mediaUrls, scheduledAt } = req.body ?? {};
   if (!caption && !mediaUrls?.length) {
     return res.status(400).json({ error: "caption o mediaUrls requerido" });
   }
@@ -103,7 +103,7 @@ router.post("/status/publish", requireAuth, async (req: AuthRequest, res: Respon
       post_id: post.id,
       post_variant_id: variant.id,
       social_account_id: account.id,
-      publish_at: new Date(),
+      publish_at: scheduledAt ? new Date(scheduledAt) : new Date(),
       status: "pending",
     },
   });
