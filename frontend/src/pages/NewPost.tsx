@@ -226,8 +226,12 @@ export function NewPost() {
 
     // Publicar en WhatsApp Status via MacroDroid
     if (showWhatsApp) {
+      if (mediaUrls.length === 0) {
+        toast({ title: "WhatsApp requiere una imagen", description: "Adjunta una imagen antes de publicar el estado.", variant: "destructive" });
+        return;
+      }
       try {
-        await whatsappApi.publishStatus(baseCaption, mediaUrls.length > 0 ? mediaUrls : undefined, scheduledIso);
+        await whatsappApi.publishStatus(baseCaption, mediaUrls, scheduledIso);
       } catch {
         overallSuccess = false;
         errorMsg = "Error al enviar a WhatsApp";
@@ -551,8 +555,10 @@ export function NewPost() {
 
           {/* Flujo automático para WhatsApp Status */}
           {showWhatsApp && (
-            <p className="text-xs text-muted-foreground">
-              El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono.
+            <p className={`text-xs ${selectedMedia.length === 0 ? "text-amber-500" : "text-muted-foreground"}`}>
+              {selectedMedia.length === 0
+                ? "⚠️ WhatsApp requiere una imagen — adjunta una antes de publicar."
+                : "El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono."}
             </p>
           )}
 
