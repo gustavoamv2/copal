@@ -265,7 +265,11 @@ async function processDirectJob(scheduled: {
 
 export async function processDuePublications(): Promise<void> {
   const due = await prisma.scheduledPublication.findMany({
-    where: { status: "pending", publish_at: { lte: new Date() } },
+    where: {
+      status: "pending",
+      publish_at: { lte: new Date() },
+      post_variant: { platform: { not: "whatsapp" } },
+    },
     include: {
       post_variant: {
         include: {
