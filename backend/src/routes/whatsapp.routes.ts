@@ -51,6 +51,23 @@ router.post("/callback", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
+router.put("/reschedule", async (req, res: Response) => {
+  const { scheduledId, userId } = req.body ?? {};
+  if (!scheduledId || !userId) return res.status(400).json({ error: "scheduledId y userId son requeridos" });
+
+  const { prisma } = await import("../prisma");
+  const record = await prisma.scheduledPublication.findFirst({
+    where: { id: scheduledId, post_variant: { post: { user_id: userId } } },
+  });
+  if (!record) return res.status(404).json({ error: "No encontrado" });
+
+  await prisma.scheduledPublication.update({
+    where: { id: scheduledId },
+    data: { status: "pending", publish_at: new Date(), attempt_count: 0 },
+  });
+  res.json({ ok: true });
+});
+
 router.post("/status/publish", requireAuth, async (req: AuthRequest, res: Response) => {
   const { caption, mediaUrls } = req.body ?? {};
   if (!caption && !mediaUrls?.length) {
