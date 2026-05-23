@@ -139,7 +139,12 @@ function EventChip({ arg }: { arg: EventContentArg }) {
       <NetworkIcon network={network} />
       <span
         className="truncate"
-        style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.01em" }}
+        style={{
+          fontSize: "11px",
+          fontWeight: 600,
+          letterSpacing: "0.01em",
+          textDecoration: status === "published" ? "line-through" : "none",
+        }}
       >
         {tipo}
       </span>

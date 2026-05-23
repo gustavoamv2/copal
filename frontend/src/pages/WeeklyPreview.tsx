@@ -141,7 +141,7 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all duration-150 bg-card group ${isPublished ? "opacity-50" : ""}`}
+      className={`relative w-full text-left rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all duration-150 bg-card group ${isPublished ? "opacity-50" : ""}`}
     >
       {/* Header: platform color bar */}
       <div
@@ -183,6 +183,18 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
           {post.base_caption || post.title}
         </p>
       </div>
+
+      {/* Published overlay badge */}
+      {isPublished && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span
+            className="px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase shadow-lg"
+            style={{ backgroundColor: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(2px)" }}
+          >
+            Publicada
+          </span>
+        </div>
+      )}
     </button>
   );
 }
