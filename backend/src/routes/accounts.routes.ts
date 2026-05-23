@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import { createError } from "../middleware/error.middleware";
+import { decrypt } from "../utils/crypto";
 
 const router = Router();
 router.use(requireAuth);
@@ -35,6 +36,25 @@ router.delete("/:id", async (req: AuthRequest, res, next) => {
     if (!account) throw createError("Account not found", 404);
     await prisma.socialAccount.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Debug: check what permissions the stored token has
+router.get("/:id/debug-token", async (req: AuthRequest, res, next) => {
+  try {
+    const account = await prisma.socialAccount.findFirst({
+      where: { id: req.params.id, user_id: req.user!.sub },
+    });
+    if (!account) throw createError("Account not found", 404);
+
+    const token = decrypt(account.access_token_enc);
+    const debugRes = await fetch(
+      `https://graph.facebook.com/debug_token?input_token=${token}&access_token=${token}`
+    );
+    const debug = await debugRes.json();
+    res.json({ platform: account.platform, account_id: account.account_id, debug });
   } catch (err) {
     next(err);
   }
