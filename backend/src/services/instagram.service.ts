@@ -79,9 +79,9 @@ export async function publishToInstagram(
         access_token: token,
       }),
     });
-    const data = (await res.json()) as { id?: string; error?: { message: string } };
+    const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] story container response:`, JSON.stringify(data));
-    if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram story container");
+    if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create Instagram story container"}`);
     containerId = data.id;
 
   } else if (instagramType === "carousel" || mediaAssets.length > 1) {
@@ -99,9 +99,9 @@ export async function publishToInstagram(
           access_token: token,
         }),
       });
-      const data = (await res.json()) as { id?: string; error?: { message: string } };
+      const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
       console.log(`[Instagram] carousel item response:`, JSON.stringify(data));
-      if (!data.id) throw new Error(data.error?.message ?? "Failed to create carousel item");
+      if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create carousel item"}`);
       if (isVideo) await waitForContainer(pageId, data.id, token);
       childIds.push(data.id);
     }
@@ -111,7 +111,7 @@ export async function publishToInstagram(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ media_type: "CAROUSEL", children: childIds.join(","), caption, access_token: token }),
     });
-    const carouselData = (await carouselRes.json()) as { id?: string; error?: { message: string } };
+    const carouselData = (await carouselRes.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] carousel container response:`, JSON.stringify(carouselData));
     if (!carouselData.id) throw new Error(carouselData.error?.message ?? "Failed to create carousel");
     containerId = carouselData.id;
@@ -124,9 +124,9 @@ export async function publishToInstagram(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ video_url: asset.storage_url, media_type: "REELS", caption, access_token: token }),
     });
-    const data = (await res.json()) as { id?: string; error?: { message: string } };
+    const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] reel container response:`, JSON.stringify(data));
-    if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram Reel container");
+    if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create Instagram Reel container"}`);
     containerId = data.id;
 
   } else {
@@ -146,9 +146,9 @@ export async function publishToInstagram(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = (await res.json()) as { id?: string; error?: { message: string } };
+    const data = (await res.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
     console.log(`[Instagram] feed container response:`, JSON.stringify(data));
-    if (!data.id) throw new Error(data.error?.message ?? "Failed to create Instagram media container");
+    if (!data.id) throw new Error(`Instagram (${data.error?.code ?? "?"}): ${data.error?.message ?? "Failed to create Instagram media container"}`);
     containerId = data.id;
   }
 
@@ -161,7 +161,7 @@ export async function publishToInstagram(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ creation_id: containerId, access_token: token }),
   });
-  const publishData = (await publishRes.json()) as { id?: string; error?: { message: string } };
+  const publishData = (await publishRes.json()) as { id?: string; error?: { message: string; code?: number; type?: string } };
   console.log(`[Instagram] media_publish response:`, JSON.stringify(publishData));
   if (!publishData.id) throw new Error(publishData.error?.message ?? "Failed to publish Instagram post");
 

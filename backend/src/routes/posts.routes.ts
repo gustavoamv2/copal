@@ -212,6 +212,10 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
             result = await publishToInstagram(account, variant.caption, mediaAssets, igType);
           } else if (variant.platform === "facebook") {
             result = await publishToFacebook(account, variant.caption, mediaAssets, fbType);
+          } else if (variant.platform === "whatsapp") {
+            // WhatsApp uses device polling — mark as scheduled, skip direct publish
+            successCount++;
+            continue;
           } else {
             result = await publishToLinkedIn(account, variant.caption, mediaAssets);
           }
