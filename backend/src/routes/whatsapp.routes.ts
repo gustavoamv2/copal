@@ -33,6 +33,23 @@ router.delete("/register", requireAuth, async (req: AuthRequest, res: Response) 
   res.json({ ok: true });
 });
 
+// Libera registros atascados en "processing" devolviéndolos a "pending"
+router.get("/reset-stuck", async (req, res: Response) => {
+  const userId = req.query.userId as string;
+  if (!userId) return res.status(400).json({ error: "userId es requerido" });
+
+  const { prisma } = await import("../prisma");
+  const result = await prisma.scheduledPublication.updateMany({
+    where: {
+      status: "processing",
+      post_variant: { platform: "whatsapp", post: { user_id: userId } },
+    },
+    data: { status: "failed" },
+  });
+
+  res.json({ ok: true, updated: result.count });
+});
+
 router.get("/pending", async (req, res: Response) => {
   const userId = req.query.userId as string;
   if (!userId) return res.status(400).json({ error: "userId es requerido" });
