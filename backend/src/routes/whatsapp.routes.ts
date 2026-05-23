@@ -98,6 +98,11 @@ router.post("/status/publish", requireAuth, async (req: AuthRequest, res: Respon
     },
   });
 
+  // Guardar mediaUrls en job_data para que getPendingPublication las devuelva a MacroDroid
+  const jobData = Array.isArray(mediaUrls) && mediaUrls.length > 0
+    ? { mediaUrls: mediaUrls as string[] }
+    : undefined;
+
   await prisma.scheduledPublication.create({
     data: {
       post_id: post.id,
@@ -105,6 +110,7 @@ router.post("/status/publish", requireAuth, async (req: AuthRequest, res: Respon
       social_account_id: account.id,
       publish_at: scheduledAt ? new Date(scheduledAt) : new Date(),
       status: "pending",
+      ...(jobData ? { job_data: jobData } : {}),
     },
   });
 

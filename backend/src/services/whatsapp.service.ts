@@ -74,7 +74,10 @@ export async function getPendingPublication(userId: string) {
   const { post_variant } = scheduled;
   const { post } = post_variant;
 
-  const mediaUrls = post.post_media.map((pm) => pm.media_asset.storage_url);
+  // Preferir post_media (flujo estándar); si está vacío, usar job_data (flujo /status/publish)
+  const assetUrls = post.post_media.map((pm) => pm.media_asset.storage_url);
+  const jobData = scheduled.job_data as { mediaUrls?: string[] } | null;
+  const mediaUrls = assetUrls.length > 0 ? assetUrls : (jobData?.mediaUrls ?? []);
 
   await prisma.scheduledPublication.update({
     where: { id: scheduled.id },
