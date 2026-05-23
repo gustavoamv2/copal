@@ -136,23 +136,6 @@ export function NewPost() {
     toast({ title: `Caption copiado${imgMsg} ✓ — pega el texto y sube la imagen en LinkedIn` });
   };
 
-  const copyAndOpenWhatsApp = async () => {
-    try {
-      await navigator.clipboard.writeText(baseCaption);
-    } catch {}
-
-    if (selectedMedia.length > 0) {
-      await downloadImages(selectedMedia.map((m) => ({ storage_url: m.storage_url, filename: m.filename })));
-    }
-
-    window.open("https://web.whatsapp.com/", "_blank");
-
-    const imgMsg = selectedMedia.length > 0
-      ? ` · ${selectedMedia.length} imagen${selectedMedia.length > 1 ? "es descargadas" : " descargada"}`
-      : "";
-    toast({ title: `Caption copiado${imgMsg} ✓ — en WhatsApp Web ve a Estados (ícono de cámara) y pega el texto + sube la imagen` });
-  };
-
   const toggleAyrPlatform = (p: SocialPlatform) => {
     setAyrPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
     if (ayrPlatforms.includes(p)) {
