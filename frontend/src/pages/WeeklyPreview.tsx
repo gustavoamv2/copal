@@ -135,11 +135,13 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
     ? new Date(post.scheduled_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
     : "";
 
+  const isPublished = post.status === "published";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all duration-150 bg-card group"
+      className={`w-full text-left rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all duration-150 bg-card group ${isPublished ? "opacity-50" : ""}`}
     >
       {/* Header: platform color bar */}
       <div

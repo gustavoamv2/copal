@@ -172,7 +172,7 @@ function PostsTab({ initialStatus = "" }: { initialStatus?: string }) {
                 return (
                   <div
                     key={post.id}
-                    className={`flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors cursor-pointer ${isChecked ? "bg-accent/20" : ""}`}
+                    className={`flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors cursor-pointer ${isChecked ? "bg-accent/20" : ""} ${post.status === "published" ? "opacity-50" : ""}`}
                     onClick={() => setSelectedPost(post)}
                   >
                     {/* Checkbox */}

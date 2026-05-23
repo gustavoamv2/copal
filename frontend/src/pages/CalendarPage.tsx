@@ -122,8 +122,8 @@ function parseEventMeta(post: Post): { network: string; tipo: string; bg: string
 // ─── Custom event chip ────────────────────────────────────────────────────────
 
 function EventChip({ arg }: { arg: EventContentArg }) {
-  const { network, tipo } = arg.event.extendedProps as {
-    network: string; tipo: string; postId: string;
+  const { network, tipo, status } = arg.event.extendedProps as {
+    network: string; tipo: string; postId: string; status: string;
   };
 
   return (
@@ -133,6 +133,7 @@ function EventChip({ arg }: { arg: EventContentArg }) {
         padding: "2px 5px",
         color: "white",
         lineHeight: 1,
+        opacity: status === "published" ? 0.5 : 1,
       }}
     >
       <NetworkIcon network={network} />
@@ -180,7 +181,7 @@ export function CalendarPage() {
               start: post.scheduled_at!,
               backgroundColor: PLATFORM_COLORS[v.platform as Platform] ?? "#6366f1",
               borderColor: "transparent",
-              extendedProps: { postId: post.id, network: vNetwork, tipo },
+              extendedProps: { postId: post.id, network: vNetwork, tipo, status: post.status },
             };
           });
       }
@@ -191,7 +192,7 @@ export function CalendarPage() {
         start: post.scheduled_at!,
         backgroundColor: bg,
         borderColor: "transparent",
-        extendedProps: { postId: post.id, network, tipo },
+        extendedProps: { postId: post.id, network, tipo, status: post.status },
       }];
     });
 

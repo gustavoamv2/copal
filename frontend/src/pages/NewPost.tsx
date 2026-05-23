@@ -548,18 +548,19 @@ export function NewPost() {
             </div>
           )}
 
-          {/* Flujo manual para WhatsApp Status */}
+          {/* Flujo automático para WhatsApp Status */}
           {showWhatsApp && (
             <div className="rounded-lg border border-[#25D366]/30 bg-[#25D366]/8 p-3 space-y-2">
               <p className="text-xs text-[#25D366] font-medium">
                 Estados de WhatsApp
               </p>
               <p className="text-xs text-muted-foreground">
-                Copia el caption y descarga la imagen. Luego en WhatsApp Web ve a la pestaña <strong>Estados</strong> (ícono de cámara), pega el texto y sube la imagen.
+                El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono. También puedes publicarlo manualmente desde WhatsApp Web.
               </p>
               <Button
                 variant="outline"
-                className="w-full border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                size="sm"
+                className="w-full border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366] text-xs"
                 disabled={!baseCaption}
                 onClick={copyAndOpenWhatsApp}
               >
