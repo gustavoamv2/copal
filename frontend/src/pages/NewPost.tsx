@@ -555,18 +555,8 @@ export function NewPost() {
                 Estados de WhatsApp
               </p>
               <p className="text-xs text-muted-foreground">
-                El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono. También puedes publicarlo manualmente desde WhatsApp Web.
+                El estado se publicará automáticamente cuando se ejecute la Macro en tu teléfono.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366] text-xs"
-                disabled={!baseCaption}
-                onClick={copyAndOpenWhatsApp}
-              >
-                {selectedMedia.length > 0 ? "🖼 " : "📋 "}
-                Copiar caption{selectedMedia.length > 0 ? ` + descargar imagen${selectedMedia.length > 1 ? "es" : ""}` : ""} y abrir WhatsApp Web
-              </Button>
             </div>
           )}
 
