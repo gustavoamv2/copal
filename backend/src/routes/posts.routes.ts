@@ -14,7 +14,7 @@ router.use(requireAuth);
 
 const variantSchema = z.object({
   social_account_id: z.string().uuid(),
-  platform: z.enum(["instagram", "facebook", "linkedin"]),
+  platform: z.enum(["instagram", "facebook", "linkedin", "whatsapp"]),
   caption: z.string(),
 });
 

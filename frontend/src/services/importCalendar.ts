@@ -134,7 +134,7 @@ export function mapPlatforms(
       case "Instagram":
         return "instagram";
       case "WhatsApp":
-        return undefined;
+        return "whatsapp";
     }
   }).filter((p): p is Platform => p !== undefined);
   return { platforms, instagramType };
@@ -278,13 +278,11 @@ export async function importPublication(
       (pub.networks.length > 0 ? pub.networks.join(" / ") : null);
     const titleForCalendar = tipoLabel ? `${tipoLabel} · ${pub.title}` : pub.title;
 
-    // Build variants for auto-platforms (facebook, instagram).
-    // LinkedIn is intentionally excluded — those posts remain as manual pending.
-    const variants: { social_account_id: string; platform: "instagram" | "facebook" | "linkedin"; caption: string }[] = [];
+    // Build variants for all auto-platforms (instagram, facebook, linkedin, whatsapp)
+    const variants: { social_account_id: string; platform: "instagram" | "facebook" | "linkedin" | "whatsapp"; caption: string }[] = [];
     if (effectiveMode === "scheduled") {
       const { platforms } = mapPlatforms(pub.networks, pub.instagramType);
       for (const platform of platforms) {
-        if (platform === "linkedin") continue;
         const account = activeAccounts.find((a) => a.platform === platform && a.is_active);
         if (account) {
           variants.push({ social_account_id: account.id, platform, caption: pub.caption });
