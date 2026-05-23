@@ -91,10 +91,9 @@ export async function publishToInstagram(
     containerId = data.id;
 
   } else if (instagramType === "carousel" || mediaAssets.length > 1) {
-    const childIds: string[] = [];
-    for (const asset of mediaAssets) {
+    // Create all child containers in parallel to avoid sequential delays (~4s each)
+    const childIds = await Promise.all(mediaAssets.map(async (asset) => {
       const isVideo = asset.file_type.startsWith("video/");
-      // Carousel items: square 1080x1080
       const mediaUrl = isVideo ? asset.storage_url : cdnTransform(asset.storage_url, "w_1080,h_1080,c_fill,f_jpg");
       const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
         method: "POST",
@@ -110,8 +109,8 @@ export async function publishToInstagram(
       if (data.error) throw new Error(`Instagram (${data.error.code ?? "?"}): ${data.error.message}`);
       if (!data.id) throw new Error("Failed to create carousel item");
       if (isVideo) await waitForContainer(pageId, data.id, token, true);
-      childIds.push(data.id);
-    }
+      return data.id;
+    }));
 
     const carouselRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/media`, {
       method: "POST",
