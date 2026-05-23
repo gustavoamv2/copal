@@ -29,11 +29,11 @@ router.get("/meta/connect", oauthAuth, (req: AuthRequest, res) => {
   const params = new URLSearchParams({
     client_id: config.META_APP_ID,
     redirect_uri: config.META_REDIRECT_URI,
-    scope: "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish",
+    scope: "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_content_publish",
     response_type: "code",
     state,
   });
-  const redirectUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params}`;
+  const redirectUrl = `https://www.facebook.com/v22.0/dialog/oauth?${params}`;
   console.log("[OAUTH] Full redirect URL:", redirectUrl);
   res.redirect(redirectUrl);
 });
@@ -47,7 +47,7 @@ router.get("/meta/callback", async (req, res, next) => {
 
     // Exchange code for user access token
     const tokenRes = await fetch(
-      `https://graph.facebook.com/v19.0/oauth/access_token?` +
+      `https://graph.facebook.com/v22.0/oauth/access_token?` +
         new URLSearchParams({
           client_id: config.META_APP_ID,
           client_secret: config.META_APP_SECRET,
@@ -60,7 +60,7 @@ router.get("/meta/callback", async (req, res, next) => {
 
     // Exchange short-lived user token for long-lived (~60 days) so page tokens are also long-lived
     const longLivedRes = await fetch(
-      "https://graph.facebook.com/v19.0/oauth/access_token?" +
+      "https://graph.facebook.com/v22.0/oauth/access_token?" +
         new URLSearchParams({
           grant_type: "fb_exchange_token",
           client_id: config.META_APP_ID,
@@ -76,7 +76,7 @@ router.get("/meta/callback", async (req, res, next) => {
     let pages: PageEntry[] = [];
 
     const pagesRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${userToken}`
+      `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token&access_token=${userToken}`
     );
     const pagesData = (await pagesRes.json()) as { data?: PageEntry[] };
     pages = pagesData.data ?? [];
@@ -84,12 +84,12 @@ router.get("/meta/callback", async (req, res, next) => {
     // Fallback: Business Manager owned pages
     if (pages.length === 0) {
       const bizRes = await fetch(
-        `https://graph.facebook.com/v19.0/me/businesses?access_token=${userToken}`
+        `https://graph.facebook.com/v22.0/me/businesses?access_token=${userToken}`
       );
       const bizData = (await bizRes.json()) as { data?: Array<{ id: string }> };
       for (const biz of bizData.data ?? []) {
         const bizPagesRes = await fetch(
-          `https://graph.facebook.com/v19.0/${biz.id}/owned_pages?fields=id,name,access_token&access_token=${userToken}`
+          `https://graph.facebook.com/v22.0/${biz.id}/owned_pages?fields=id,name,access_token&access_token=${userToken}`
         );
         const bizPages = (await bizPagesRes.json()) as { data?: PageEntry[] };
         pages = pages.concat(bizPages.data ?? []);
@@ -109,14 +109,14 @@ router.get("/meta/callback", async (req, res, next) => {
 
       // Detect linked Instagram Business account
       const igRes = await fetch(
-        `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
+        `https://graph.facebook.com/v22.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
       );
       const igData = (await igRes.json()) as { instagram_business_account?: { id: string } };
 
       if (igData.instagram_business_account?.id) {
         const igId = igData.instagram_business_account.id;
         const igInfoRes = await fetch(
-          `https://graph.facebook.com/v19.0/${igId}?fields=id,username&access_token=${page.access_token}`
+          `https://graph.facebook.com/v22.0/${igId}?fields=id,username&access_token=${page.access_token}`
         );
         const igInfo = (await igInfoRes.json()) as { id?: string; username?: string };
 
