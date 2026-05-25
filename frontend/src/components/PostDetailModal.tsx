@@ -354,7 +354,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const titleLower = post.title.toLowerCase();
   const instagramType: "feed" | "story" | "carousel" | "reel" =
     titleLower.includes("reel")     ? "reel"
-    : titleLower.includes("story")  ? "story"
+    : titleLower.includes("story") || titleLower.includes("historia")  ? "story"
     : titleLower.includes("carrusel") || titleLower.includes("carousel") ? "carousel"
     : "feed";
   const facebookType: "post" | "reel" | "story" =
@@ -366,9 +366,6 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const isPublished = post.status === "published" ||
     (post.variants.length > 0 && post.variants.every((v) => v.status === "published"));
 
-  // LinkedIn posts use copy+open flow — they cannot be auto-published via API
-  const isLinkedIn = post.variants.some((v) => v.platform === "linkedin") ||
-    titleLower.includes("linkedin");
   // LinkedIn personal profile posts CAN be auto-published; org pages cannot
   const isLinkedInOrg = post.variants.some(
     (v) => v.platform === "linkedin" && v.social_account?.account_id?.startsWith("urn:li:organization:")
@@ -445,19 +442,13 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   };
 
   // Platforms for reprogramar (prefill NewPost form)
-  const reprogramarPlatforms = unique.length > 0
-    ? (unique as string[]).filter((p): p is "instagram" | "facebook" | "linkedin" => p !== "generic")
+  const ayrPlatformsForPrefill = unique.length > 0
+    ? unique.filter((p): p is "instagram" | "facebook" | "linkedin" => p !== "whatsapp")
     : (titleLower.includes("instagram") ? ["instagram"]
       : titleLower.includes("facebook") ? ["facebook"]
       : ["linkedin"]) as ("instagram" | "facebook" | "linkedin")[];
 
   const handleReprogramar = () => {
-    // LinkedIn posts can't be auto-scheduled — send to Pendiente Manual tab
-    if (isLinkedIn) {
-      navigate("/scheduled?tab=manual");
-      onClose();
-      return;
-    }
     navigate("/posts/new", {
       state: {
         prefill: {
@@ -465,9 +456,11 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           caption: post.base_caption,
           scheduledAt: post.scheduled_at,
           media: (post.post_media ?? []).map((pm) => pm.media_asset),
-          platforms: reprogramarPlatforms,
+          platforms: ayrPlatformsForPrefill,
           instagramType,
           facebookType,
+          showWhatsApp: isWhatsApp,
+          showLinkedInPages: isLinkedInOrg,
         },
       },
     });

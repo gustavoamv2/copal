@@ -973,7 +973,7 @@ function ConfirmStep({ publications, onBack, onDone }: ConfirmStepProps) {
           <span className="text-base">💬</span>
           <div>
             <p className="font-medium text-foreground">WhatsApp</p>
-            <p className="text-xs text-muted-foreground">Se publica automaticamente via el telefono (MacroDroid consulta cada 60s)</p>
+            <p className="text-xs text-muted-foreground">Se publica automaticamente via el telefono (MacroDroid consulta cada 15 minutos)</p>
           </div>
           <span className="ml-auto text-xs font-medium text-green-500 shrink-0">Auto</span>
         </div>

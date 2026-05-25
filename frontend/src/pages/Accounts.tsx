@@ -169,7 +169,7 @@ function WhatsAppPanel() {
             </div>
             <p className="text-xs text-muted-foreground">
               Las publicaciones se enviaran al telefono via polling del endpoint /api/whatsapp/pending.
-              MacroDroid en el telefono debe consultar cada 60s y publicar via UI Automation.
+              MacroDroid en el telefono debe consultar cada 15 minutos y publicar via UI Automation.
             </p>
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-muted-foreground">+{displayPhone}</span>

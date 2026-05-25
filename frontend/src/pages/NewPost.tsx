@@ -25,6 +25,8 @@ interface PrefillData {
   platforms: SocialPlatform[];
   instagramType: InstagramPostType;
   facebookType: FacebookPostType;
+  showWhatsApp?: boolean;
+  showLinkedInPages?: boolean;
 }
 
 export function NewPost() {
@@ -49,9 +51,9 @@ export function NewPost() {
   });
   const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>(prefill?.media ?? []);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
-  const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["linkedin"]);
-  const [showLinkedInPages, setShowLinkedInPages] = useState(false);
-  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [ayrPlatforms, setAyrPlatforms] = useState<SocialPlatform[]>(prefill?.platforms ?? ["facebook", "instagram", "linkedin"]);
+  const [showLinkedInPages, setShowLinkedInPages] = useState(prefill?.showLinkedInPages ?? false);
+  const [showWhatsApp, setShowWhatsApp] = useState(prefill?.showWhatsApp ?? false);
   const [postType, setPostType] = useState<"publicacion" | "historia" | "carrusel" | "reel">(() => {
     if (prefill?.instagramType === "carousel") return "carrusel";
     if (prefill?.instagramType === "story" || prefill?.facebookType === "story") return "historia";
@@ -153,22 +155,23 @@ export function NewPost() {
   const whatsAppCompatible = postType === "historia";
   const linkedinPagesCompatible = postType === "publicacion";
 
-  // When postType changes, prune incompatible platforms
+  // When postType changes, auto-select compatible platforms
   const setPostTypeSafe = (t: typeof postType) => {
     setPostType(t);
     if (t === "carrusel") {
-      setAyrPlatforms((prev) => prev.filter((p) => p === "instagram"));
+      setAyrPlatforms(["instagram"]);
       setShowLinkedInPages(false);
       setShowWhatsApp(false);
     } else if (t === "historia") {
-      setAyrPlatforms((prev) => prev.filter((p) => p === "instagram"));
+      setAyrPlatforms(["instagram"]);
       setShowLinkedInPages(false);
+      setShowWhatsApp(true);
     } else if (t === "reel") {
-      setAyrPlatforms((prev) => prev.filter((p) => p === "instagram" || p === "facebook"));
+      setAyrPlatforms(["facebook", "instagram"]);
       setShowLinkedInPages(false);
       setShowWhatsApp(false);
     } else {
-      setAyrPlatforms((prev) => prev.filter((p) => p !== "whatsapp" as SocialPlatform));
+      setAyrPlatforms(["facebook", "instagram", "linkedin"]);
       setShowLinkedInPages(false);
       setShowWhatsApp(false);
     }
