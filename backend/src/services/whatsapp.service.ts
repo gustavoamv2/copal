@@ -43,53 +43,66 @@ export async function unregisterWhatsAppDevice(userId: string): Promise<void> {
 }
 
 export async function getPendingPublication(userId: string) {
-  const scheduled = await prisma.scheduledPublication.findFirst({
+  const stuckThreshold = new Date(Date.now() - 3 * 60 * 1000);
+  await prisma.scheduledPublication.updateMany({
     where: {
-      status: "pending",
-      publish_at: { lte: new Date() },
-      post_variant: {
-        platform: "whatsapp",
-        post: { user_id: userId },
-      },
+      status: "processing",
+      last_attempt_at: { lt: stuckThreshold },
+      post_variant: { platform: "whatsapp", post: { user_id: userId } },
     },
-    include: {
-      post_variant: {
-        include: {
-          post: {
-            include: {
-              post_media: {
-                include: { media_asset: true },
-                orderBy: { order_index: "asc" },
+    data: { status: "pending" },
+  });
+
+  const result = await prisma.$transaction(async (tx) => {
+    const scheduled = await tx.scheduledPublication.findFirst({
+      where: {
+        status: "pending",
+        publish_at: { lte: new Date() },
+        post_variant: {
+          platform: "whatsapp",
+          post: { user_id: userId },
+        },
+      },
+      include: {
+        post_variant: {
+          include: {
+            post: {
+              include: {
+                post_media: {
+                  include: { media_asset: true },
+                  orderBy: { order_index: "asc" },
+                },
               },
             },
           },
         },
       },
-    },
-    orderBy: { publish_at: "asc" },
+      orderBy: { publish_at: "asc" },
+    });
+
+    if (!scheduled) return null;
+
+    await tx.scheduledPublication.update({
+      where: { id: scheduled.id },
+      data: { status: "processing", attempt_count: { increment: 1 }, last_attempt_at: new Date() },
+    });
+
+    const { post_variant } = scheduled;
+    const { post } = post_variant;
+
+    const assetUrls = post.post_media.map((pm) => pm.media_asset.storage_url);
+    const jobData = scheduled.job_data as { mediaUrls?: string[] } | null;
+    const mediaUrls = assetUrls.length > 0 ? assetUrls : (jobData?.mediaUrls ?? []);
+
+    return {
+      id: scheduled.id,
+      caption: post_variant.caption,
+      mediaUrls,
+      postTitle: post.title,
+    };
   });
 
-  if (!scheduled) return null;
-
-  const { post_variant } = scheduled;
-  const { post } = post_variant;
-
-  // Preferir post_media (flujo estándar); si está vacío, usar job_data (flujo /status/publish)
-  const assetUrls = post.post_media.map((pm) => pm.media_asset.storage_url);
-  const jobData = scheduled.job_data as { mediaUrls?: string[] } | null;
-  const mediaUrls = assetUrls.length > 0 ? assetUrls : (jobData?.mediaUrls ?? []);
-
-  await prisma.scheduledPublication.update({
-    where: { id: scheduled.id },
-    data: { status: "processing", attempt_count: { increment: 1 }, last_attempt_at: new Date() },
-  });
-
-  return {
-    id: scheduled.id,
-    caption: post_variant.caption,
-    mediaUrls,
-    postTitle: post.title,
-  };
+  return result;
 }
 
 export async function reportPublicationResult(
@@ -135,7 +148,10 @@ export async function reportPublicationResult(
     await prisma.$transaction([
       prisma.scheduledPublication.update({
         where: { id: scheduled.id },
-        data: { status: isLastAttempt ? "failed" : "pending" },
+        data: {
+          status: isLastAttempt ? "failed" : "pending",
+          ...(isLastAttempt ? {} : { publish_at: new Date(Date.now() + 60 * 1000) }),
+        },
       }),
       prisma.postPlatformVariant.update({
         where: { id: scheduled.post_variant.id },

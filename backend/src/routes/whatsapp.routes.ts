@@ -44,7 +44,7 @@ router.get("/reset-stuck", async (req, res: Response) => {
       status: "processing",
       post_variant: { platform: "whatsapp", post: { user_id: userId } },
     },
-    data: { status: "failed" },
+    data: { status: "pending", attempt_count: 0 },
   });
 
   res.json({ ok: true, updated: result.count });
@@ -61,11 +61,15 @@ router.get("/pending", async (req, res: Response) => {
 });
 
 router.post("/callback", async (req, res: Response) => {
-  const { id, userId, success, error } = req.body ?? {};
-  if (!id || !userId) return res.status(400).json({ error: "id y userId son requeridos" });
+  try {
+    const { id, userId, success, error } = req.body ?? {};
+    if (!id || !userId) return res.status(400).json({ error: "id y userId son requeridos" });
 
-  await reportPublicationResult(id, userId, !!success, error);
-  res.json({ ok: true });
+    await reportPublicationResult(id, userId, !!success, error);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
 });
 
 router.put("/reschedule", async (req, res: Response) => {

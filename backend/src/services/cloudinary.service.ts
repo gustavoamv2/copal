@@ -28,6 +28,8 @@ export async function uploadToCloudinary(
         use_filename: true,
         unique_filename: true,
         eager: resourceType === "image" ? [{ width: 400, height: 400, crop: "fill" }] : undefined,
+        quality_analysis: true,
+        transformation: resourceType === "image" ? [{ quality: "auto:best", fetch_format: "auto" }] : undefined,
       },
       (error, result) => {
         if (error || !result) return reject(error ?? new Error("Cloudinary upload failed"));
