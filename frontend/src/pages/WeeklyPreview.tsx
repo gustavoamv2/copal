@@ -207,6 +207,7 @@ export function WeeklyPreview({ embedded = false }: { embedded?: boolean }) {
 
   const [weekStart, setWeekStart] = useState(() => getMonday(today));
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [platformFilter, setPlatformFilter] = useState<Platform | "">("");
 
   const weekEnd = addDays(weekStart, 6);
   weekEnd.setHours(23, 59, 59, 999);
@@ -222,7 +223,11 @@ export function WeeklyPreview({ embedded = false }: { embedded?: boolean }) {
   const weekPosts = allPosts.filter((p) => {
     if (!p.scheduled_at) return false;
     const d = new Date(p.scheduled_at);
-    return d >= weekStart && d <= weekEnd;
+    if (d < weekStart || d > weekEnd) return false;
+    if (!platformFilter) return true;
+    const hasVariant = p.variants.some((v) => v.platform === platformFilter);
+    const titleMatch = p.title.toLowerCase().includes(platformFilter);
+    return hasVariant || titleMatch;
   });
 
   // Build 7 day columns
@@ -307,6 +312,26 @@ export function WeeklyPreview({ embedded = false }: { embedded?: boolean }) {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* ── Platform filter ─────────────────────────────────── */}
+      <div className="flex gap-1.5 flex-wrap">
+        {([
+          { label: "Todas", value: "" as const },
+          { label: "Instagram", value: "instagram" as const },
+          { label: "Facebook", value: "facebook" as const },
+          { label: "LinkedIn", value: "linkedin" as const },
+          { label: "WhatsApp", value: "whatsapp" as const },
+        ]).map((f) => (
+          <Button
+            key={f.value}
+            variant={platformFilter === f.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPlatformFilter(f.value)}
+          >
+            {f.label}
+          </Button>
+        ))}
       </div>
 
       {/* ── 7-day grid ─────────────────────────────────────── */}

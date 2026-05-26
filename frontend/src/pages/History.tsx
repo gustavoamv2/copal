@@ -21,6 +21,14 @@ const STATUS_LABELS: Record<string, string> = {
   scheduled: "Programados",
 };
 
+const PLATFORM_FILTERS: { label: string; value: Platform | "" }[] = [
+  { label: "Todas", value: "" },
+  { label: "Instagram", value: "instagram" },
+  { label: "Facebook", value: "facebook" },
+  { label: "LinkedIn", value: "linkedin" },
+  { label: "WhatsApp", value: "whatsapp" },
+];
+
 function failureReason(post: Post): string | null {
   if (post.status !== "failed") return null;
   const msg = post.variants.find((v) => v.error_message)?.error_message;
@@ -29,6 +37,7 @@ function failureReason(post: Post): string | null {
 
 export function History() {
   const [status, setStatus] = useState("");
+  const [platform, setPlatform] = useState<Platform | "">("");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -43,12 +52,24 @@ export function History() {
   const totalPages = Math.ceil((data?.total ?? 0) / LIMIT);
 
   const filtered = (data?.data ?? []).filter((p) => {
-    if (!search.trim()) return true;
+    if (!search.trim()) {
+      // Filter by platform only (status handled server-side)
+      if (!platform) return true;
+      const hasVariant = p.variants.some((v) => v.platform === platform);
+      const titleMatch = p.title.toLowerCase().includes(platform);
+      return hasVariant || titleMatch;
+    }
+    // Search filtering (client-side)
     const q = search.toLowerCase();
-    return (
+    const matches = (
       p.title.toLowerCase().includes(q) ||
       p.base_caption.toLowerCase().includes(q)
     );
+    if (!matches) return false;
+    if (!platform) return true;
+    const hasVariant = p.variants.some((v) => v.platform === platform);
+    const titleMatch = p.title.toLowerCase().includes(platform);
+    return hasVariant || titleMatch;
   });
 
   return (
@@ -59,7 +80,7 @@ export function History() {
       </div>
 
       {/* Filters + search */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3">
         <div className="flex gap-2 flex-wrap">
           {STATUS_FILTERS.map((f) => (
             <Button
@@ -72,14 +93,26 @@ export function History() {
             </Button>
           ))}
         </div>
-        <div className="relative sm:ml-auto sm:w-64">
-          <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar publicaciones..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
+        <div className="flex gap-2 flex-wrap items-center">
+          {PLATFORM_FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              variant={platform === f.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setPlatform(f.value); setPage(1); }}
+            >
+              {f.label}
+            </Button>
+          ))}
+          <div className="relative sm:ml-auto sm:w-64 ml-auto">
+            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar publicaciones..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
         </div>
       </div>
 

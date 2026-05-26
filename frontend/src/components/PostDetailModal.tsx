@@ -298,7 +298,31 @@ function LinkedInCard({ caption, imageUrls, dateLabel }: {
 }
 
 // ---------------------------------------------------------------------------
-// Generic card (no platform)
+// WhatsApp card
+// ---------------------------------------------------------------------------
+function WhatsAppCard({ caption, imageUrls, dateLabel }: {
+  caption: string; imageUrls: string[]; dateLabel: string;
+}) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-white/10 bg-[#075e54] text-white text-sm shadow-xl">
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+        <Avatar size={36} />
+        <div className="flex-1">
+          <p className="text-xs font-semibold leading-tight">Actualizate con IA</p>
+          <p className="text-[10px] text-green-200">{dateLabel}</p>
+        </div>
+        <MoreHorizontal className="h-4 w-4 text-green-300" />
+      </div>
+      <PostImage urls={imageUrls} platform="generic" />
+      <div className="px-3 py-3">
+        <Caption text={caption} className="text-green-50" />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Generic card (no platform / fallback)
 // ---------------------------------------------------------------------------
 function GenericCard({ caption, imageUrls, dateLabel }: {
   caption: string; imageUrls: string[]; dateLabel: string;
@@ -366,7 +390,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const isPublished = post.status === "published" ||
     (post.variants.length > 0 && post.variants.every((v) => v.status === "published"));
 
-  // LinkedIn personal profile posts CAN be auto-published; org pages cannot
+  // LinkedIn org pages cannot be auto-published via API; personal profiles can
   const isLinkedInOrg = post.variants.some(
     (v) => v.platform === "linkedin" && v.social_account?.account_id?.startsWith("urn:li:organization:")
   );
@@ -526,25 +550,28 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
         {/* ── Scrollable body ─────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {mode === "preview" ? (
-            <>
-              {activeTab === "instagram" && (
-                <InstagramCard
-                  caption={caption}
-                  imageUrls={imageUrls}
-                  instagramType={instagramType}
-                  dateLabel={dateLabel}
-                />
-              )}
-              {activeTab === "facebook" && (
-                <FacebookCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />
-              )}
-              {activeTab === "linkedin" && (
-                <LinkedInCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />
-              )}
-              {activeTab === "generic" && (
-                <GenericCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />
-              )}
-            </>
+            (() => {
+              switch (activeTab) {
+                case "instagram":
+                  return (
+                    <InstagramCard
+                      caption={caption}
+                      imageUrls={imageUrls}
+                      instagramType={instagramType}
+                      dateLabel={dateLabel}
+                    />
+                  );
+                case "facebook":
+                  return <FacebookCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />;
+                case "linkedin":
+                  return <LinkedInCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />;
+                case "whatsapp":
+                  return <WhatsAppCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />;
+                case "generic":
+                default:
+                  return <GenericCard caption={caption} imageUrls={imageUrls} dateLabel={dateLabel} />;
+              }
+            })()
           ) : (
             <div className="space-y-4">
               <div className="space-y-1.5">
@@ -614,7 +641,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
                   </Button>
                   <Button size="sm" variant="outline" onClick={handleReprogramar} className="gap-1.5">
                     <ExternalLink className="h-3.5 w-3.5" />
-                    {isLinkedInOrg ? "Pendiente Manual" : "Reprogramar/Editar"}
+                    Reprogramar / Editar
                   </Button>
                   {isPublished ? (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600/15 text-green-500 text-sm font-medium border border-green-600/25">
