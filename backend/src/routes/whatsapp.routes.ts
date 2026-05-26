@@ -34,9 +34,8 @@ router.delete("/register", requireAuth, async (req: AuthRequest, res: Response) 
 });
 
 // Libera registros atascados en "processing" devolviéndolos a "pending"
-router.get("/reset-stuck", async (req, res: Response) => {
-  const userId = req.query.userId as string;
-  if (!userId) return res.status(400).json({ error: "userId es requerido" });
+router.get("/reset-stuck", requireAuth, async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.sub;
 
   const { prisma } = await import("../prisma");
   const result = await prisma.scheduledPublication.updateMany({
@@ -54,6 +53,10 @@ router.get("/pending", async (req, res: Response) => {
   const userId = req.query.userId as string;
   if (!userId) return res.status(400).json({ error: "userId es requerido" });
 
+  // Validar que el usuario existe y tiene WhatsApp registrado
+  const account = await getWhatsAppAccount(userId);
+  if (!account) return res.status(403).json({ error: "WhatsApp no registrado para este usuario" });
+
   const pending = await getPendingPublication(userId);
   if (!pending) return res.json(null);
 
@@ -65,6 +68,10 @@ router.post("/callback", async (req, res: Response) => {
     const { id, userId, success, error } = req.body ?? {};
     if (!id || !userId) return res.status(400).json({ error: "id y userId son requeridos" });
 
+    // Validar que el usuario existe y tiene WhatsApp registrado
+    const account = await getWhatsAppAccount(userId);
+    if (!account) return res.status(403).json({ error: "WhatsApp no registrado para este usuario" });
+
     await reportPublicationResult(id, userId, !!success, error);
     res.json({ ok: true });
   } catch (err: any) {
@@ -75,6 +82,10 @@ router.post("/callback", async (req, res: Response) => {
 router.put("/reschedule", async (req, res: Response) => {
   const { scheduledId, userId } = req.body ?? {};
   if (!scheduledId || !userId) return res.status(400).json({ error: "scheduledId y userId son requeridos" });
+
+  // Validar que el usuario existe y tiene WhatsApp registrado
+  const account = await getWhatsAppAccount(userId);
+  if (!account) return res.status(403).json({ error: "WhatsApp no registrado para este usuario" });
 
   const { prisma } = await import("../prisma");
   const record = await prisma.scheduledPublication.findFirst({

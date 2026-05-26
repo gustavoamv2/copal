@@ -213,7 +213,23 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
           } else if (variant.platform === "facebook") {
             result = await publishToFacebook(account, variant.caption, mediaAssets, fbType);
           } else if (variant.platform === "whatsapp") {
-            // WhatsApp uses device polling — mark as scheduled, skip direct publish
+            // WhatsApp uses device polling — create a ScheduledPublication for the device to pick up
+            await prisma.$transaction([
+              prisma.postPlatformVariant.update({
+                where: { id: variant.id },
+                data: { status: "scheduled" },
+              }),
+              prisma.scheduledPublication.create({
+                data: {
+                  post_id: post.id,
+                  post_variant_id: variant.id,
+                  social_account_id: variant.social_account_id,
+                  publish_at: new Date(),
+                  status: "pending",
+                  ...(mediaAssets.length > 0 ? { job_data: { mediaUrls: mediaAssets.map((a) => a.storage_url) } } : {}),
+                },
+              }),
+            ]);
             successCount++;
             continue;
           } else {
@@ -235,10 +251,11 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
       }
     } else {
       // Imported posts — derive platforms from title, use active account
-      const platforms: ("instagram" | "facebook" | "linkedin")[] = [];
+      const platforms: ("instagram" | "facebook" | "linkedin" | "whatsapp")[] = [];
       if (titleLower.includes("instagram")) platforms.push("instagram");
       if (titleLower.includes("facebook"))  platforms.push("facebook");
       if (titleLower.includes("linkedin"))  platforms.push("linkedin");
+      if (titleLower.includes("whatsapp"))  platforms.push("whatsapp");
       if (platforms.length === 0) platforms.push("instagram");
 
       for (const platform of platforms) {
@@ -253,6 +270,27 @@ router.post("/:id/publish", async (req: AuthRequest, res, next) => {
             await publishToInstagram(account, post.base_caption, mediaAssets, igType);
           } else if (platform === "facebook") {
             await publishToFacebook(account, post.base_caption, mediaAssets, fbType);
+          } else if (platform === "whatsapp") {
+            // WhatsApp: create variant + ScheduledPublication for device polling
+            const variant = await prisma.postPlatformVariant.create({
+              data: {
+                post_id: post.id,
+                social_account_id: account.id,
+                platform: "whatsapp",
+                caption: post.base_caption,
+                status: "scheduled",
+              },
+            });
+            await prisma.scheduledPublication.create({
+              data: {
+                post_id: post.id,
+                post_variant_id: variant.id,
+                social_account_id: account.id,
+                publish_at: new Date(),
+                status: "pending",
+                ...(mediaAssets.length > 0 ? { job_data: { mediaUrls: mediaAssets.map((a) => a.storage_url) } } : {}),
+              },
+            });
           } else {
             await publishToLinkedIn(account, post.base_caption, mediaAssets);
           }
